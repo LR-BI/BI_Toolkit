@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflow Viewer · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  main { max-width: 1280px; }
+  .drop { border: 2px dashed var(--border); border-radius: var(--radius); padding: 1.5rem; text-align: center; color: var(--muted); transition: border-color .12s, background .12s; }
+  .drop.over { border-color: var(--accent-2); background: var(--panel); color: var(--text); }
+  .drop input { margin-top: 8px; }
+  .files { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 1rem; }
+  .files button { min-height: 0; padding: 4px 12px; font-size: 13px; }
+  .files button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 18px; margin-top: 1rem; align-items: start; }
+  .layout > div { min-width: 0; }
+  @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .side { display: flex; flex-direction: column; gap: 12px; }
+  .panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+  .panel h3 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .panel h3 button { text-transform: none; letter-spacing: 0; }
+  .outline { overflow-x: auto; padding: 6px 4px; font-size: 13px; }
+  .outline ul { list-style: none; margin: 0; padding-left: 14px; }
+  .outline > ul { padding-left: 4px; }
+  .outline li { margin: 0; }
+  .outline .it { display: flex; align-items: baseline; gap: 6px; width: 100%; text-align: left; border: 0; background: none; padding: 2px 6px; min-height: 0; border-radius: 5px; font-weight: 400; white-space: nowrap; font-size: 13px; }
+  .outline .it:hover { background: var(--panel); }
+  .outline .it.sel { background: var(--tint); color: var(--tint-text); }
+  .outline .it.hit .nm { box-shadow: inset 0 -2px 0 var(--accent-2); }
+  .outline .it.off { opacity: .5; text-decoration: line-through; }
+  .outline .ty { color: var(--muted); font-size: 11.5px; }
+  .outline .tg { width: 12px; flex: none; color: var(--muted); cursor: pointer; }
+  .outline li.closed > ul { display: none; }
+  .detail { padding: 10px 12px; font-size: 13px; }
+  .detail .kv { display: grid; grid-template-columns: 110px 1fr; gap: 3px 10px; }
+  .detail .kv > div:nth-child(odd) { color: var(--muted); }
+  .detail .kv > div:nth-child(even) { word-break: break-word; }
+  .detail pre { font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  .canvas { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; overflow: auto; background: var(--bg); }
+  .tools-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .tools-row input[type=search] { flex: 1; min-width: 180px; }
+
+  /* Diagram */
+  .wf { display: inline-flex; flex-direction: column; align-items: center; min-width: 100%; }
+  .act { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); padding: 6px 10px; min-width: 150px; max-width: 300px; cursor: pointer; text-align: left; font-size: 13px; }
+  .act:hover, .box > .bh:hover { border-color: var(--accent-2); }
+  .act .an, .bh .an { font-weight: 600; word-break: break-word; }
+  .act .at, .bh .at { font-size: 11px; color: var(--muted); }
+  .act .ap { font-size: 11.5px; color: var(--muted); margin-top: 2px; font-family: var(--mono); word-break: break-word; }
+  .act.custom { border-left: 4px solid var(--accent-2); }
+  .act.off, .box.off { opacity: .45; }
+  .act.sel, .box.sel > .bh { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .act.hit, .box.hit > .bh { box-shadow: 0 0 0 3px var(--tint); }
+  .box { border: 1px dashed var(--border); border-radius: 10px; padding: 0 10px 10px; display: flex; flex-direction: column; align-items: center; }
+  .box > .bh { align-self: stretch; margin: 0 -10px 10px; padding: 5px 10px; border-bottom: 1px dashed var(--border); border-radius: 10px 10px 0 0; cursor: pointer; background: var(--panel); border: 1px solid transparent; }
+  .box.root { border-style: solid; }
+  .seq { display: flex; flex-direction: column; align-items: center; }
+  .arrow { width: 2px; height: 14px; background: var(--accent-2); position: relative; margin: 2px 0 6px; }
+  .arrow::after { content: ""; position: absolute; left: -4px; bottom: -6px; border: 5px solid transparent; border-top-color: var(--accent-2); }
+  .branches { display: flex; gap: 14px; align-items: flex-start; }
+  .branch { display: flex; flex-direction: column; align-items: center; border-top: 2px solid var(--accent-2); padding-top: 8px; min-width: 140px; }
+  .blabel { font-size: 11.5px; color: var(--tint-text); background: var(--tint); border-radius: 6px; padding: 2px 8px; margin-bottom: 8px; max-width: 280px; text-align: center; word-break: break-word; }
+  .loop { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .empty-slot { font-size: 12px; color: var(--muted); font-style: italic; padding: 4px; }
+  .fnode { border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin: 0 0 10px; min-width: 260px; background: var(--bg); }
+  .fnode .fk { font-size: 11px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; gap: 8px; }
+  .fnext { font-size: 12px; margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .fnext a { cursor: pointer; text-decoration: none; background: var(--tint); color: var(--tint-text); border-radius: 6px; padding: 1px 8px; }
+  .fnode.start { border-color: var(--accent-2); border-width: 2px; }
+  .fnode > .an { font-weight: 600; margin-bottom: 6px; }
+  .states { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; width: 100%; }
+  .refs li { margin: .2rem 0; font-size: 14px; }
+  .bad { color: var(--danger); font-weight: 600; }
+  .typelist { columns: 2; column-gap: 24px; font-size: 13.5px; padding-left: 1.1rem; }
+  @media (max-width: 700px) { .typelist { columns: 1; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Workflow Viewer</h1>
+  <p class="lead">Open Windows Workflow files (<code>.xoml</code> from WF3, <code>.xaml</code> from WF4) as a readable diagram, outline and property list. Add the matching <code>.rules</code> file and conditions show as real expressions.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li>Drop one or more files below: the workflow (<code>.xoml</code> or <code>.xaml</code>) and, for WF3, its <code>.rules</code> file if there is one. You can also paste the XML.</li>
+      <li>The <strong>diagram</strong> reads top to bottom. Side-by-side columns are branches (if/else, parallel, listen); dashed boxes group what's inside a sequence, loop or state. Custom (non-Microsoft) activities have a purple left edge; disabled ones are faded.</li>
+      <li>Click anything in the diagram or the <strong>outline</strong> to see all its properties in <strong>Details</strong>, including bound values and conditions.</li>
+      <li>Big workflows shrink to fit the page; untick <strong>Fit to width</strong> to see them full size and drag the diagram to move around.</li>
+      <li>Use <strong>Find</strong> to highlight activities by name, type or any property value (e.g. a field name or rule name). Press Enter to step through matches.</li>
+      <li>Below the diagram: activity types used, methods and rules referenced (missing rules flagged), and <strong>Copy outline</strong> for documentation.</li>
+    </ol>
+    <p>Try <strong>Sample WF3</strong> or <strong>Sample WF4</strong> first. Files never leave your browser.</p>
+  </details>
+
+  <div class="drop" id="drop">
+    Drop <code>.xoml</code>, <code>.xaml</code> or <code>.rules</code> files here, or
+    <div><input type="file" id="file" multiple accept=".xoml,.xaml,.rules,.xml,text/xml"></div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="s3">Sample WF3 (.xoml + .rules)</button>
+    <button id="s4">Sample WF4 (.xaml flowchart)</button>
+    <button id="pasteToggle">Paste XML instead</button>
+  </div>
+  <div id="pasteWrap" hidden style="margin-top:8px">
+    <textarea id="paste" placeholder="Paste workflow or rules XML"></textarea>
+    <button id="pasteBtn" class="primary" style="margin-top:6px">Open</button>
+  </div>
+  <div class="err" id="err"></div>
+
+  <section id="res" hidden>
+    <div class="files" id="files"></div>
+    <div class="cards" id="cards"></div>
+    <div class="layout">
+      <div class="side">
+        <div class="panel"><h3>Outline <span><button class="small" id="expAll">Expand</button> <button class="small" id="colAll">Collapse</button></span></h3><div class="outline" id="outline"></div></div>
+        <div class="panel"><h3>Details</h3><div class="detail" id="detail"><span class="meta">Click an activity.</span></div></div>
+      </div>
+      <div>
+        <div class="tools-row">
+          <input type="search" id="find" placeholder="Find activity, type or value…">
+          <span class="meta" id="findInfo" style="margin:0"></span>
+          <label class="inline"><input type="checkbox" id="fit" checked> Fit to width</label>
+          <button id="copyOutline">Copy outline</button>
+        </div>
+        <div class="canvas pan" id="canvasBox"><div class="wf" id="diagram"></div></div>
+      </div>
+    </div>
+
+    <h2>Activity types</h2>
+    <ul class="typelist" id="types"></ul>
+    <h2>References</h2>
+    <div id="refs"></div>
+    <div id="rulesets"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var NS_X = "http://schemas.microsoft.com/winfx/2006/xaml";
+  var NS_WF3 = "http://schemas.microsoft.com/winfx/2006/xaml/workflow";
+  var NS_WF4 = "http://schemas.microsoft.com/netfx/2009/xaml/activities";
+
+  var FILES = [];   // {name, text, kind:'wf'|'rules', model?, rules?}
+  var RULES = { conds: {}, sets: [] };
+  var CUR = null;   // current workflow file
+  var NODES = [];   // flat list for current workflow
+
+  // ---------- helpers ----------
+  function kids(el) { var a = []; for (var c = el.firstElementChild; c; c = c.nextElementSibling) a.push(c); return a; }
+  function isNoiseNs(ns) { ns = ns || ""; return /\/presentation\b|markup-compatibility/i.test(ns) || /System\.Activities\.Presentation/.test(ns); }
+  function isProp(el) { return el.localName.indexOf(".") >= 0; }
+  function propName(el) { return el.localName.split(".").pop(); }
+  function shortType(n) { return String(n || "").replace(/Activity$/, "") || n; }
+  function nsLabel(ns) {
+    if (!ns) return "";
+    if (ns === NS_WF3) return "WF3 (System.Workflow.Activities)";
+    if (ns === NS_WF4) return "WF4 (System.Activities)";
+    var m = /clr-namespace:([^;]+)(?:;\s*assembly=([^;]+))?/i.exec(ns);
+    return m ? m[1] + (m[2] ? "  [" + m[2] + "]" : "") : ns;
+  }
+  function isCustom(ns) { return !(ns === NS_WF3 || ns === NS_WF4 || /clr-namespace:System\.(Workflow|Activities|ServiceModel)/i.test(ns || "")); }
+  function clip(s, n) { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+  function refName(s) { var m = /x:Reference\s+([^}\s,]+)/.exec(s || ""); return m ? m[1] : null; }
+  function decode(buf) {
+    var b = new Uint8Array(buf), enc = "utf-8";
+    if (b[0] === 0xFF && b[1] === 0xFE) enc = "utf-16le"; else if (b[0] === 0xFE && b[1] === 0xFF) enc = "utf-16be";
+    else if (b.length > 1 && b[0] === 0x3C && b[1] === 0x00) enc = "utf-16le";
+    return new TextDecoder(enc).decode(b);
+  }
+  function parseXml(text) {
+    text = String(text || "").replace(/^\uFEFF/, "").replace(/^\s*<\?xml[^>]*\?>/, "").trim();
+    var d = new DOMParser().parseFromString(text, "application/xml");
+    if (d.getElementsByTagName("parsererror").length) throw new Error("That isn't valid XML.");
+    return d.documentElement;
+  }
+
+  var NONACT = {};
+  ("InArgument OutArgument InOutArgument Variable VisualBasicValue VisualBasicReference CSharpValue CSharpReference Literal ActivityBind " +
+   "RuleConditionReference CodeCondition WorkflowParameterBinding Reference AssemblyReference DelegateInArgument DelegateOutArgument " +
+   "ActivityAction ActivityFunc Catch FlowStep FlowDecision FlowSwitch Transition Members Property DynamicActivityProperty Null Static Type Array " +
+   "String Int32 Int64 Boolean DateTime Decimal Double Object Guid TimeSpan").split(" ").forEach(function (w) { NONACT[w] = 1; });
+  var TRANSPARENT = { ActivityAction: 1, ActivityFunc: 1, Catch: 1 };
+
+  function isActivity(el) {
+    if (isProp(el)) return false;
+    var ns = el.namespaceURI || "";
+    if (ns === NS_X || isNoiseNs(ns)) return false;
+    if (NONACT[el.localName]) return false;
+    if (/^clr-namespace:System(\.Collections|\.Xml|\.Linq|\.Data)?;/i.test(ns)) return false;
+    return true;
+  }
+
+  function summarize(el) {
+    if (!el) return "";
+    var ln = el.localName;
+    if (ln === "RuleConditionReference") return "rule: " + el.getAttribute("ConditionName");
+    if (/^(In|Out|InOut)Argument$/.test(ln)) { var inner = kids(el)[0]; return inner ? summarize(inner) : clip(el.textContent, 300); }
+    if (ln === "CodeCondition") return "code: " + (el.getAttribute("Condition") || "");
+    if (/Value$|Reference$/.test(ln) && el.getAttribute("ExpressionText")) return el.getAttribute("ExpressionText");
+    if (ln === "Reference" && el.namespaceURI === NS_X) return "→ " + el.textContent.trim();
+    var ch = kids(el).filter(function (c) { return !isNoiseNs(c.namespaceURI); });
+    if (ch.length === 1 && !isProp(el)) return summarize(ch[0]) || clip(el.textContent, 300);
+    if (ch.length === 1 && isProp(el)) return summarize(ch[0]);
+    if (ch.length) return ch.map(summarize).filter(Boolean).join("; ");
+    var a = [];
+    for (var i = 0; i < el.attributes.length; i++) { var at = el.attributes[i]; if (!/^xmlns/.test(at.name) && !isNoiseNs(at.namespaceURI)) a.push(at.localName + "=" + at.value); }
+    var t = clip(el.textContent, 300);
+    return (a.length ? ln + "(" + a.join(", ") + ")" : "") + (t ? (a.length ? " " : "") + t : "") || ln;
+  }
+
+  // ---------- model ----------
+  var seq = 0;
+  function build(el, parent) {
+    var n = { id: "a" + (++seq), el: el, type: el.localName, ns: el.namespaceURI || "", name: "", display: "", attrs: [], props: [], vars: [], kids: [], slots: [], parent: parent || null, disabled: false, cond: "" };
+    n.custom = isCustom(n.ns);
+    for (var i = 0; i < el.attributes.length; i++) {
+      var a = el.attributes[i];
+      if (/^xmlns/.test(a.name) || isNoiseNs(a.namespaceURI) || a.name === "mc:Ignorable") continue;
+      if (a.namespaceURI === NS_X && a.localName === "Name") { n.name = a.value; continue; }
+      if (a.namespaceURI === NS_X && a.localName === "Class") { n.cls = a.value; continue; }
+      if (a.localName === "DisplayName") { n.display = a.value; continue; }
+      if (a.localName === "Name" && !n.name) { n.name = a.value; continue; }
+      if (a.localName === "Enabled" && /false/i.test(a.value)) n.disabled = true;
+      n.attrs.push([a.namespaceURI === NS_X ? "x:" + a.localName : a.localName, a.value]);
+    }
+    if (n.type === "Flowchart") { buildFlow(n); NODES.push(n); return n; }
+    if (n.type === "StateMachine") { buildStates(n); NODES.push(n); return n; }
+    NODES.push(n);
+    kids(el).forEach(function (c) {
+      if (isNoiseNs(c.namespaceURI)) return;
+      if (isProp(c)) {
+        var pn = propName(c);
+        if (/^(Settings|NamespacesForImplementation|ReferencesForImplementation|ViewState|HintSize)$/.test(pn)) return;
+        if (pn === "Variables") { kids(c).forEach(function (v) { n.vars.push((v.getAttribute("Name") || v.getAttributeNS(NS_X, "Name") || "?") + " : " + (v.getAttributeNS(NS_X, "TypeArguments") || "") + (v.getAttribute("Default") ? " = " + v.getAttribute("Default") : "")); }); return; }
+        var acts = findActs(c, n);
+        if (acts.length) { n.slots.push({ label: pn, nodes: acts }); return; }
+        var sm = summarize(c);
+        n.props.push([pn, sm]);
+        if (/Condition|Expression|Until/.test(pn)) n.cond = sm;
+        return;
+      }
+      if (c.namespaceURI === NS_X && c.localName === "Members") {
+        kids(c).forEach(function (p) { n.vars.push("argument " + p.getAttribute("Name") + " : " + (p.getAttribute("Type") || "")); });
+        return;
+      }
+      if (isActivity(c)) { n.kids.push(build(c, n)); return; }
+      if (TRANSPARENT[c.localName]) { findActs(c, n).forEach(function (a) { n.kids.push(a); }); return; }
+      n.props.push([c.localName, summarize(c)]);
+    });
+    if (!n.cond) n.attrs.forEach(function (a) { if (/^(Condition|Expression)$/.test(a[0])) n.cond = a[1]; });
+    return n;
+  }
+  function findActs(el, parent) {
+    var out = [];
+    kids(el).forEach(function (c) {
+      if (isNoiseNs(c.namespaceURI)) return;
+      if (isActivity(c)) out.push(build(c, parent));
+      else if (TRANSPARENT[c.localName] || isProp(c)) findActs(c, parent).forEach(function (a) { out.push(a); });
+    });
+    return out;
+  }
+
+  // WF4 flowchart
+  function buildFlow(n) {
+    var el = n.el, nodes = [], byKey = {}, gen = 0;
+    function collect(e) {
+      kids(e).forEach(function (c) {
+        if (isNoiseNs(c.namespaceURI)) return;
+        if (c.localName === "Flowchart" && c !== el) return; // nested chart: separate
+        if (/^Flow(Step|Decision|Switch)$/.test(c.localName)) {
+          var key = c.getAttributeNS(NS_X, "Name") || ("node" + (++gen));
+          c.__key = key;
+          if (!byKey[key]) { byKey[key] = c; nodes.push(c); }
+        }
+        if (!(c.localName === "Flowchart")) collect(c);
+      });
+    }
+    collect(el);
+    function target(e) { // from a prop element or attr value
+      if (!e) return null;
+      if (typeof e === "string") return refName(e);
+      var c = kids(e)[0]; if (!c) return null;
+      if (c.namespaceURI === NS_X && c.localName === "Reference") return c.textContent.trim();
+      return c.__key || null;
+    }
+    function prop(e, name) { return kids(e).filter(function (c) { return isProp(c) && propName(c) === name; })[0] || null; }
+    var start = target(prop(el, "StartNode")) || refName(el.getAttribute("StartNode")) || (nodes[0] && nodes[0].__key);
+    var vp = prop(el, "Variables");
+    if (vp) kids(vp).forEach(function (v) { n.vars.push((v.getAttribute("Name") || v.getAttributeNS(NS_X, "Name") || "?") + " : " + (v.getAttributeNS(NS_X, "TypeArguments") || "") + (v.getAttribute("Default") ? " = " + v.getAttribute("Default") : "")); });
+    var flow = { start: start, nodes: [] };
+    nodes.forEach(function (fe) {
+      var f = { key: fe.__key, kind: fe.localName.replace("Flow", ""), next: [], act: null, cond: "" };
+      if (fe.localName === "FlowStep") {
+        var a = kids(fe).filter(function (c) { return !isProp(c) && isActivity(c); })[0];
+        if (a) f.act = build(a, n);
+        var nx = target(prop(fe, "Next")) || refName(fe.getAttribute("Next"));
+        if (nx) f.next.push({ label: "next", key: nx });
+      } else if (fe.localName === "FlowDecision") {
+        f.cond = fe.getAttribute("Condition") || summarize(prop(fe, "Condition"));
+        var t = target(prop(fe, "True")) || refName(fe.getAttribute("True")), fl = target(prop(fe, "False")) || refName(fe.getAttribute("False"));
+        if (t) f.next.push({ label: fe.getAttribute("TrueLabel") || "true", key: t });
+        if (fl) f.next.push({ label: fe.getAttribute("FalseLabel") || "false", key: fl });
+        if (fe.getAttribute("DisplayName")) f.title = fe.getAttribute("DisplayName");
+      } else {
+        if (fe.getAttribute("DisplayName")) f.title = fe.getAttribute("DisplayName");
+        f.cond = fe.getAttribute("Expression") || summarize(prop(fe, "Expression"));
+        var d = target(prop(fe, "Default")) || refName(fe.getAttribute("Default"));
+        if (d) f.next.push({ label: "default", key: d });
+        kids(fe).forEach(function (c) {
+          var k = c.getAttributeNS(NS_X, "Key"); if (k === null || k === "") return;
+          var key = (c.namespaceURI === NS_X && c.localName === "Reference") ? c.textContent.trim() : c.__key;
+          if (key) f.next.push({ label: "case " + k, key: key });
+        });
+      }
+      flow.nodes.push(f);
+    });
+    // order: walk from start, then the rest
+    var order = [], seen = {}, map = {};
+    flow.nodes.forEach(function (f) { map[f.key] = f; });
+    (function walk(k) { if (!k || seen[k] || !map[k]) return; seen[k] = 1; order.push(map[k]); map[k].next.forEach(function (x) { walk(x.key); }); })(start);
+    flow.nodes.forEach(function (f) { if (!seen[f.key]) order.push(f); });
+    order.forEach(function (f, i) { f.no = i + 1; });
+    flow.nodes = order; flow.map = map;
+    n.flow = flow;
+  }
+
+  // WF4 state machine
+  function buildStates(n) {
+    var el = n.el, states = [], byKey = {}, gen = 0;
+    (function collect(e) {
+      kids(e).forEach(function (c) {
+        if (isNoiseNs(c.namespaceURI)) return;
+        if (c.localName === "StateMachine") return;
+        if (c.localName === "State" && !isProp(c)) { var k = c.getAttributeNS(NS_X, "Name") || ("state" + (++gen)); c.__key = k; if (!byKey[k]) { byKey[k] = c; states.push(c); } }
+        collect(c);
+      });
+    })(el);
+    function prop(e, name) { return kids(e).filter(function (c) { return isProp(c) && propName(c) === name; })[0] || null; }
+    function tgt(p, attr) { if (attr) return refName(attr); if (!p) return null; var c = kids(p)[0]; if (!c) return null; return (c.namespaceURI === NS_X && c.localName === "Reference") ? c.textContent.trim() : c.__key; }
+    var init = tgt(prop(el, "InitialState"), el.getAttribute("InitialState"));
+    n.sm = { init: init, states: states.map(function (s) {
+      var st = { key: s.__key, title: s.getAttribute("DisplayName") || s.__key, final: /true/i.test(s.getAttribute("IsFinal") || ""), entry: [], exit: [], trans: [] };
+      var en = prop(s, "Entry"), ex = prop(s, "Exit"), tr = prop(s, "Transitions");
+      if (en) st.entry = findActs(en, n);
+      if (ex) st.exit = findActs(ex, n);
+      if (tr) kids(tr).forEach(function (t) {
+        st.trans.push({ title: t.getAttribute("DisplayName") || "", to: tgt(prop(t, "To"), t.getAttribute("To")), cond: t.getAttribute("Condition") || summarize(prop(t, "Condition")),
+          trigger: findActs(prop(t, "Trigger") || document.createElement("x"), n), action: findActs(prop(t, "Action") || document.createElement("x"), n) });
+      });
+      return st;
+    }) };
+  }
+
+  // ---------- rules (.rules CodeDom) ----------
+  var OPS = { ValueEquality: "==", IdentityEquality: "==", IdentityInequality: "!=", BooleanAnd: "AND", BooleanOr: "OR", LessThan: "<", LessThanOrEqual: "<=",
+    GreaterThan: ">", GreaterThanOrEqual: ">=", Add: "+", Subtract: "-", Multiply: "*", Divide: "/", Modulus: "%", BitwiseAnd: "&", BitwiseOr: "|", Assign: "=" };
+  function pchild(el, name) { var p = kids(el).filter(function (c) { return isProp(c) && propName(c) === name; })[0]; return p ? (kids(p)[0] || null) : null; }
+  function pchildren(el, name) { var p = kids(el).filter(function (c) { return isProp(c) && propName(c) === name; })[0]; return p ? kids(p) : []; }
+  function cd(e) {
+    if (!e) return "";
+    var t = e.localName, tgt;
+    switch (t) {
+      case "CodeBinaryOperatorExpression": return "(" + cd(pchild(e, "Left")) + " " + (OPS[e.getAttribute("Operator")] || e.getAttribute("Operator")) + " " + cd(pchild(e, "Right")) + ")";
+      case "CodePropertyReferenceExpression": case "CodeFieldReferenceExpression":
+        tgt = cd(pchild(e, "TargetObject")); var nm = e.getAttribute("PropertyName") || e.getAttribute("FieldName");
+        return (tgt && tgt !== "this" ? tgt + "." : "") + nm;
+      case "CodeThisReferenceExpression": return "this";
+      case "CodePrimitiveExpression":
+        var v = pchild(e, "Value");
+        if (!v) return e.getAttribute("Value") !== null ? e.getAttribute("Value") : "null";
+        return v.localName === "String" ? '"' + v.textContent + '"' : v.textContent;
+      case "CodeMethodInvokeExpression":
+        var m = pchild(e, "Method");
+        return cd(m) + "(" + pchildren(e, "Parameters").map(cd).join(", ") + ")";
+      case "CodeMethodReferenceExpression": tgt = cd(pchild(e, "TargetObject")); return (tgt && tgt !== "this" ? tgt + "." : "") + e.getAttribute("MethodName");
+      case "CodeTypeReferenceExpression": var tr = pchild(e, "Type"); return tr ? String(tr.getAttribute("BaseType") || "").split(".").pop() : "Type";
+      case "CodeCastExpression": var tt = pchild(e, "TargetType"); return "(" + (tt ? String(tt.getAttribute("BaseType")).split(".").pop() : "?") + ")" + cd(pchild(e, "Expression"));
+      case "CodeIndexerExpression": case "CodeArrayIndexerExpression": return cd(pchild(e, "TargetObject")) + "[" + pchildren(e, "Indices").map(cd).join(", ") + "]";
+      case "CodeArgumentReferenceExpression": return e.getAttribute("ParameterName");
+      case "CodeVariableReferenceExpression": return e.getAttribute("VariableName");
+      case "CodeAssignStatement": return cd(pchild(e, "Left")) + " = " + cd(pchild(e, "Right"));
+      case "CodeExpressionStatement": return cd(pchild(e, "Expression"));
+      case "RuleExpressionCondition": return cd(pchild(e, "Expression"));
+      case "RuleStatementAction": return cd(pchild(e, "CodeDomStatement"));
+      case "RuleHaltAction": return "HALT";
+      case "RuleUpdateAction": return "UPDATE " + (e.getAttribute("Path") || "");
+      default: return t + (kids(e).length ? "(" + kids(e).map(cd).join(", ") + ")" : "");
+    }
+  }
+  function parseRules(root) {
+    var out = { conds: {}, sets: [] };
+    Array.prototype.forEach.call(root.getElementsByTagNameNS("*", "RuleExpressionCondition"), function (c) {
+      var nm = c.getAttribute("Name"); if (nm) out.conds[nm] = cd(c);
+    });
+    Array.prototype.forEach.call(root.getElementsByTagNameNS("*", "RuleSet"), function (rs) {
+      var set = { name: rs.getAttribute("Name"), rules: [] };
+      Array.prototype.forEach.call(rs.getElementsByTagNameNS("*", "Rule"), function (r) {
+        set.rules.push({ name: r.getAttribute("Name"), priority: r.getAttribute("Priority") || "0", active: !/false/i.test(r.getAttribute("Active") || ""),
+          cond: cd(pchild(r, "Condition")), then: pchildren(r, "ThenActions").map(cd), els: pchildren(r, "ElseActions").map(cd) });
+      });
+      out.sets.push(set);
+    });
+    return out;
+  }
+
+  // ---------- loading ----------
+  function addFile(name, text) {
+    var root;
+    try { root = parseXml(text); } catch (e) { $("err").textContent = name + ": " + e.message; return; }
+    if (root.localName === "RuleDefinitions") {
+      var r = parseRules(root);
+      Object.keys(r.conds).forEach(function (k) { RULES.conds[k] = r.conds[k]; });
+      RULES.sets = RULES.sets.concat(r.sets);
+      FILES.push({ name: name, kind: "rules" });
+    } else {
+      FILES = FILES.filter(function (f) { return f.name !== name; });
+      FILES.push({ name: name, kind: "wf", root: root, text: text });
+      CUR = FILES[FILES.length - 1];
+    }
+  }
+  function loadMany(list) {
+    $("err").textContent = "";
+    list.forEach(function (f) { addFile(f.name, f.text); });
+    if (!CUR) { var w = FILES.filter(function (f) { return f.kind === "wf"; })[0]; CUR = w || null; }
+    render();
+  }
+
+  // ---------- render ----------
+  function render() {
+    $("res").hidden = !FILES.length;
+    var fb = $("files"); fb.innerHTML = "";
+    FILES.forEach(function (f) {
+      var b = document.createElement("button");
+      b.textContent = (f.kind === "rules" ? "rules · " : "") + f.name;
+      if (f === CUR) b.className = "on";
+      if (f.kind === "wf") b.addEventListener("click", function () { CUR = f; render(); });
+      else b.disabled = true;
+      fb.appendChild(b);
+    });
+    if (!CUR) { $("diagram").innerHTML = '<p class="meta">Rules loaded. Add the workflow file too.</p>'; $("outline").innerHTML = ""; $("cards").innerHTML = ""; $("types").innerHTML = ""; renderRefs(null); return; }
+    NODES = []; seq = 0;
+    var root = build(CUR.root, null);
+    CUR.model = root;
+    // resolve rule conditions
+    NODES.forEach(function (n) {
+      var m = /^rule: (.+)$/.exec(n.cond || "");
+      if (m) { n.ruleName = m[1]; n.ruleExpr = RULES.conds[m[1]] || null; }
+    });
+    renderCards(root);
+    $("outline").innerHTML = ""; $("outline").appendChild(outline([root]));
+    var d = $("diagram"); d.innerHTML = ""; d.appendChild(draw(root, true)); fit();
+    renderTypes(); renderRefs(root);
+    $("detail").innerHTML = '<span class="meta">Click an activity.</span>';
+    doFind();
+  }
+
+  function card(k, v) { var d = document.createElement("div"); d.className = "card"; d.innerHTML = "<div class='k'></div><div class='v' style='font-size:18px'></div>"; d.children[0].textContent = k; d.children[1].textContent = v; return d; }
+  function renderCards(root) {
+    var c = $("cards"); c.innerHTML = "";
+    var fmt = root.ns === NS_WF3 || /\.xoml$/i.test(CUR.name) ? "WF3 (.xoml)" : (root.ns === NS_WF4 || root.type === "Activity" ? "WF4 (.xaml)" : "Workflow XAML");
+    c.appendChild(card("Format", fmt));
+    c.appendChild(card("Workflow", root.cls ? root.cls.split(".").pop() : (root.display || root.name || shortType(root.type))));
+    c.appendChild(card("Activities", NODES.length));
+    var custom = {}; NODES.forEach(function (n) { if (n.custom) custom[n.type] = 1; });
+    c.appendChild(card("Custom types", Object.keys(custom).length));
+    var off = NODES.filter(function (n) { return n.disabled; }).length;
+    if (off) c.appendChild(card("Disabled", off));
+  }
+
+  function label(n) { return n.display || n.name || (n.cls ? n.cls.split(".").pop() : "") || shortType(n.type); }
+  function keyProp(n) {
+    var pick = null;
+    if (n.type === "Assign") {
+      var to = n.props.filter(function (x) { return x[0] === "To"; })[0] || n.attrs.filter(function (x) { return x[0] === "To"; })[0];
+      var va = n.props.filter(function (x) { return x[0] === "Value"; })[0] || n.attrs.filter(function (x) { return x[0] === "Value"; })[0];
+      if (to || va) return clip((to ? to[1] : "?") + " = " + (va ? va[1] : "?"), 90);
+    }
+    ["ExecuteCode", "TargetStateName", "To", "Value", "Text", "MethodName", "InterfaceType", "EventName"].some(function (k) {
+      var a = n.attrs.filter(function (x) { return x[0] === k; })[0] || n.props.filter(function (x) { return x[0] === k; })[0];
+      if (a) { pick = k + ": " + a[1]; return true; }
+    });
+    if (!pick && n.custom) { var a = n.attrs.filter(function (x) { return !/^x:/.test(x[0]); })[0]; if (a) pick = a[0] + ": " + a[1]; }
+    return pick ? clip(pick, 90) : "";
+  }
+
+  // Outline
+  function outline(list) {
+    var ul = document.createElement("ul");
+    list.forEach(function (n) {
+      var li = document.createElement("li");
+      var row = document.createElement("div"); row.style.display = "flex";
+      var ch = childrenOf(n);
+      var tg = document.createElement("span"); tg.className = "tg"; tg.textContent = ch.length ? "▾" : "";
+      tg.addEventListener("click", function (e) { e.stopPropagation(); li.classList.toggle("closed"); tg.textContent = li.classList.contains("closed") ? "▸" : "▾"; });
+      var b = document.createElement("button"); b.className = "it" + (n.disabled ? " off" : ""); b.dataset.id = n.id;
+      var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = label(n);
+      var ty = document.createElement("span"); ty.className = "ty"; ty.textContent = shortType(n.type);
+      b.appendChild(nm); if (label(n) !== shortType(n.type)) b.appendChild(ty);
+      b.addEventListener("click", function () { select(n.id, true); });
+      row.appendChild(tg); row.appendChild(b); li.appendChild(row);
+      if (ch.length) li.appendChild(outline(ch));
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+  function childrenOf(n) {
+    var out = n.kids.slice();
+    n.slots.forEach(function (s) { out = out.concat(s.nodes); });
+    if (n.flow) n.flow.nodes.forEach(function (f) { if (f.act) out.push(f.act); });
+    if (n.sm) n.sm.states.forEach(function (s) { out = out.concat(s.entry, s.exit); s.trans.forEach(function (t) { out = out.concat(t.trigger, t.action); }); });
+    return out;
+  }
+
+  // Diagram
+  var BRANCHY = /^(IfElseActivity|ParallelActivity|ListenActivity|ConditionedActivityGroup|Pick|Parallel|If|Switch|TryCatch|FaultHandlersActivity|EventHandlersActivity)$/;
+  var LOOPY = /^(WhileActivity|While|DoWhile|ForEach|ParallelForEach|ReplicatorActivity)$/;
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function head(n, tagCls) {
+    var h = el("div", tagCls);
+    h.appendChild(el("div", "at", shortType(n.type) + (n.custom ? " · custom" : "") + (n.disabled ? " · disabled" : "")));
+    h.appendChild(el("div", "an", label(n)));
+    var kp = keyProp(n); if (kp) h.appendChild(el("div", "ap", kp));
+    h.addEventListener("click", function (e) { e.stopPropagation(); select(n.id, false); });
+    return h;
+  }
+  function column(list) {
+    var c = el("div", "seq");
+    if (!list.length) { c.appendChild(el("div", "empty-slot", "(empty)")); return c; }
+    list.forEach(function (k, i) { if (i) c.appendChild(el("div", "arrow")); c.appendChild(draw(k)); });
+    return c;
+  }
+  function condLabel(n) {
+    if (n.ruleName) return n.ruleExpr ? n.ruleExpr : "rule " + n.ruleName;
+    return n.cond || "";
+  }
+  function draw(n, isRoot) {
+    var ch = n.kids, hasSlots = n.slots.length;
+    if (!ch.length && !hasSlots && !n.flow && !n.sm) {
+      var a = head(n, "act" + (n.custom ? " custom" : "") + (n.disabled ? " off" : ""));
+      a.dataset.id = n.id; return a;
+    }
+    var box = el("div", "box" + (isRoot ? " root" : "") + (n.disabled ? " off" : "")); box.dataset.id = n.id;
+    box.appendChild(head(n, "bh"));
+    if (n.flow) { box.appendChild(drawFlow(n)); return box; }
+    if (n.sm) { box.appendChild(drawStates(n)); return box; }
+    if (LOOPY.test(n.type)) {
+      var c = condLabel(n); if (c) box.appendChild(el("div", "loop", "↻ " + (/While/.test(n.type) ? "while " : "for each ") + clip(c, 140)));
+    }
+    var branchy = BRANCHY.test(n.type);
+    if (branchy && ch.length) {
+      var row = el("div", "branches");
+      ch.forEach(function (k) {
+        var b = el("div", "branch");
+        var lbl = condLabel(k) || (k.type === "IfElseBranchActivity" && !condLabel(k) ? "else" : "");
+        if (lbl) b.appendChild(el("div", "blabel", (k.type === "IfElseBranchActivity" && condLabel(k) ? "if " : "") + clip(lbl, 160)));
+        b.appendChild(draw(k));
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+    } else if (ch.length) {
+      box.appendChild(column(ch));
+    }
+    if (hasSlots) {
+      if (n.slots.length > 1 || branchy) {
+        if (n.type === "If" && n.cond) box.appendChild(el("div", "loop", "if " + clip(n.cond, 160)));
+        var r2 = el("div", "branches");
+        n.slots.forEach(function (s) { var b = el("div", "branch"); b.appendChild(el("div", "blabel", s.label)); b.appendChild(column(s.nodes)); r2.appendChild(b); });
+        box.appendChild(r2);
+      } else {
+        if (n.slots[0].label !== "Body" && n.slots[0].label !== "Implementation" && n.slots[0].label !== "Activities") box.appendChild(el("div", "loop", n.slots[0].label));
+        box.appendChild(column(n.slots[0].nodes));
+      }
+    }
+    return box;
+  }
+  function drawFlow(n) {
+    var wrap = el("div", "seq");
+    var f = n.flow;
+    if (!f.nodes.length) { wrap.appendChild(el("div", "empty-slot", "(empty flowchart)")); return wrap; }
+    f.nodes.forEach(function (fn) {
+      var d = el("div", "fnode" + (fn.key === f.start ? " start" : "")); d.id = n.id + "_" + fn.key;
+      var top = el("div", "fk"); top.appendChild(el("span", "", "#" + fn.no + "  " + fn.kind + (fn.key === f.start ? " · start" : ""))); top.appendChild(el("span", "", fn.key));
+      d.appendChild(top);
+      if (fn.act) d.appendChild(draw(fn.act));
+      if (fn.title) d.appendChild(el("div", "an", fn.title));
+      if (fn.cond) d.appendChild(el("div", "blabel", (fn.kind === "Decision" ? "if " : "switch on ") + clip(fn.cond, 200)));
+      var nx = el("div", "fnext");
+      if (!fn.next.length) { var en = el("span", "", "end"); en.style.color = "var(--muted)"; nx.appendChild(en); }
+      fn.next.forEach(function (x) {
+        var t = f.map[x.key];
+        var a = el("a", "", x.label + " → #" + (t ? t.no : "?") + (t && t.act ? " " + clip(label(t.act), 30) : ""));
+        a.addEventListener("click", function () { var tg = document.getElementById(n.id + "_" + x.key); if (tg) { tg.scrollIntoView({ behavior: "smooth", block: "center" }); flash(tg); } });
+        nx.appendChild(a);
+      });
+      d.appendChild(nx);
+      wrap.appendChild(d);
+    });
+    return wrap;
+  }
+  function drawStates(n) {
+    var g = el("div", "states");
+    n.sm.states.forEach(function (s) {
+      var d = el("div", "fnode" + (s.key === n.sm.init ? " start" : "")); d.id = n.id + "_" + s.key;
+      var top = el("div", "fk"); top.appendChild(el("span", "", "State" + (s.key === n.sm.init ? " · initial" : "") + (s.final ? " · final" : ""))); top.appendChild(el("span", "", s.key));
+      d.appendChild(top); d.appendChild(el("div", "an", s.title));
+      if (s.entry.length) { d.appendChild(el("div", "loop", "on entry")); d.appendChild(column(s.entry)); }
+      if (s.exit.length) { d.appendChild(el("div", "loop", "on exit")); d.appendChild(column(s.exit)); }
+      s.trans.forEach(function (t) {
+        var nx = el("div", "fnext");
+        var target = n.sm.states.filter(function (x) { return x.key === t.to; })[0];
+        var a = el("a", "", (t.title || "transition") + " → " + (target ? target.title : t.to || "?"));
+        a.addEventListener("click", function () { var tg = document.getElementById(n.id + "_" + t.to); if (tg) { tg.scrollIntoView({ behavior: "smooth", block: "center" }); flash(tg); } });
+        nx.appendChild(a); d.appendChild(nx);
+        if (t.cond) d.appendChild(el("div", "ap", "when " + clip(t.cond, 140)));
+        if (t.trigger.length) d.appendChild(column(t.trigger));
+      });
+      g.appendChild(d);
+    });
+    return g;
+  }
+  function flash(e) { e.style.outline = "3px solid var(--accent-2)"; setTimeout(function () { e.style.outline = ""; }, 1200); }
+
+  function fit() {
+    var d = $("diagram"), box = $("canvasBox"); d.style.zoom = "";
+    if (!$("fit").checked) return;
+    var avail = box.clientWidth - 34, need = d.scrollWidth;
+    if (need > avail && avail > 0) d.style.zoom = Math.max(0.35, avail / need);
+  }
+  window.addEventListener("resize", fit);
+
+  // Selection & details
+  function byId(id) { return NODES.filter(function (n) { return n.id === id; })[0]; }
+  function select(id, scroll) {
+    document.querySelectorAll(".sel").forEach(function (e) { e.classList.remove("sel"); });
+    var n = byId(id); if (!n) return;
+    var dg = document.querySelector('#diagram [data-id="' + id + '"]'); if (dg) { dg.classList.add("sel"); if (scroll) dg.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" }); }
+    var ol = document.querySelector('#outline .it[data-id="' + id + '"]'); if (ol) { ol.classList.add("sel"); if (!scroll) ol.scrollIntoView({ block: "nearest" }); }
+    var d = $("detail"); d.innerHTML = "";
+    var kv = el("div", "kv");
+    function row(k, v, mono) { if (v === undefined || v === null || v === "") return; kv.appendChild(el("div", "", k)); var x = el("div", "", v); if (mono) x.style.fontFamily = "var(--mono)"; kv.appendChild(x); }
+    row("Type", n.type); row("From", nsLabel(n.ns)); row("Name", n.name); row("Display", n.display);
+    if (n.cls) row("Class", n.cls);
+    if (n.disabled) row("Status", "Disabled");
+    var path = [], p = n.parent; while (p) { path.unshift(label(p)); p = p.parent; } row("Inside", path.join(" › "));
+    n.attrs.forEach(function (a) { row(a[0], a[1], /\{|\[/.test(a[1])); });
+    n.props.forEach(function (a) { row(a[0], a[1], true); });
+    if (n.ruleName) row("Rule", n.ruleName + (n.ruleExpr ? "" : " (not found; load the .rules file)"));
+    d.appendChild(kv);
+    if (n.ruleExpr) { d.appendChild(el("div", "meta", "Rule condition")); d.appendChild(el("pre", "", n.ruleExpr)); }
+    if (n.vars.length) { d.appendChild(el("div", "meta", "Variables / arguments")); d.appendChild(el("pre", "", n.vars.join("\n"))); }
+  }
+
+  // Find
+  var hits = [], hitAt = -1;
+  function hay(n) { return (n.type + " " + n.name + " " + n.display + " " + n.attrs.map(function (a) { return a[0] + " " + a[1]; }).join(" ") + " " + n.props.map(function (a) { return a[0] + " " + a[1]; }).join(" ") + " " + (n.ruleName || "") + " " + (n.ruleExpr || "")).toLowerCase(); }
+  function doFind() {
+    var q = $("find").value.trim().toLowerCase();
+    document.querySelectorAll(".hit").forEach(function (e) { e.classList.remove("hit"); });
+    hits = []; hitAt = -1;
+    if (!q) { $("findInfo").textContent = ""; return; }
+    NODES.forEach(function (n) { if (hay(n).indexOf(q) >= 0) hits.push(n.id); });
+    hits.forEach(function (id) {
+      var a = document.querySelector('#diagram [data-id="' + id + '"]'); if (a) a.classList.add("hit");
+      var b = document.querySelector('#outline .it[data-id="' + id + '"]'); if (b) b.classList.add("hit");
+    });
+    $("findInfo").textContent = hits.length + " match" + (hits.length === 1 ? "" : "es");
+  }
+
+  // Types & references
+  function renderTypes() {
+    var t = {}; NODES.forEach(function (n) { var k = n.type; (t[k] = t[k] || { n: 0, custom: n.custom, ns: n.ns }).n++; });
+    var ul = $("types"); ul.innerHTML = "";
+    Object.keys(t).sort(function (a, b) { return (t[b].custom - t[a].custom) || (t[b].n - t[a].n); }).forEach(function (k) {
+      var li = el("li", "", k + " × " + t[k].n + (t[k].custom ? "  (custom: " + nsLabel(t[k].ns) + ")" : ""));
+      ul.appendChild(li);
+    });
+  }
+  function renderRefs(root) {
+    var r = $("refs"); r.innerHTML = "";
+    var rs = $("rulesets"); rs.innerHTML = "";
+    if (root) {
+      var methods = {}, rules = {}, binds = {}, setstates = {}, stateNames = {};
+      NODES.forEach(function (n) {
+        if (/StateActivity$|^State$/.test(n.type)) stateNames[n.name] = 1;
+        n.attrs.concat(n.props).forEach(function (a) {
+          if (/^(ExecuteCode|MethodInvoking|Invoked|Sending|Initialize|Handler|UntilCondition)$/.test(a[0]) && !/\{|\[/.test(a[1])) methods[a[1]] = (methods[a[1]] || 0) + 1;
+          if (/^code: /.test(a[1])) { var mm = a[1].slice(6); methods[mm] = (methods[mm] || 0) + 1; }
+          var bm = /\{ActivityBind\s+([^,}]+)(?:,\s*Path=([^}]+))?\}/.exec(a[1]); if (bm) binds[bm[1].trim() + (bm[2] ? "." + bm[2].trim() : "")] = 1;
+          if (a[0] === "TargetStateName") setstates[a[1]] = 1;
+        });
+        if (n.ruleName) rules[n.ruleName] = !!n.ruleExpr;
+      });
+      function list(title, items, fn) {
+        if (!items.length) return;
+        r.appendChild(el("h3", "", title)).style.cssText = "font-size:14px;margin:1rem 0 .25rem";
+        var ul = el("ul", "refs"); items.forEach(function (i) { ul.appendChild(fn(i)); }); r.appendChild(ul);
+      }
+      list("Code methods called (in the code-behind, not in this file)", Object.keys(methods).sort(), function (m) { return el("li", "", m + (methods[m] > 1 ? "  ×" + methods[m] : "")); });
+      list("Rule conditions", Object.keys(rules).sort(), function (m) { var li = el("li", rules[m] ? "" : "bad", m + (rules[m] ? "  ✓ " + clip(RULES.conds[m], 120) : "  missing: load the .rules file or check the name")); return li; });
+      list("Bound values (ActivityBind)", Object.keys(binds).sort(), function (m) { return el("li", "", m); });
+      list("State changes (SetState)", Object.keys(setstates).sort(), function (m) { return el("li", stateNames[m] ? "" : "bad", m + (stateNames[m] ? "" : "  no state with this name")); });
+      if (!r.children.length) r.appendChild(el("p", "meta", "No code methods, rules or bindings referenced."));
+    }
+    if (RULES.sets.length) {
+      rs.appendChild(el("h2", "", "Rule sets"));
+      RULES.sets.forEach(function (s) {
+        rs.appendChild(el("h3", "", s.name)).style.cssText = "font-size:14px;margin:1rem 0 .25rem";
+        var t = el("table");
+        t.innerHTML = "<thead><tr><th>Rule</th><th>Priority</th><th>If</th><th>Then</th><th>Else</th></tr></thead>";
+        var tb = el("tbody");
+        s.rules.forEach(function (ru) {
+          var tr = el("tr"); if (!ru.active) tr.style.opacity = ".5";
+          [ru.name + (ru.active ? "" : " (inactive)"), ru.priority, ru.cond, ru.then.join("\n"), ru.els.join("\n")].forEach(function (v, i) { var td = el("td", "", v); if (i > 1) { td.style.fontFamily = "var(--mono)"; td.style.fontSize = "12px"; td.style.whiteSpace = "pre-wrap"; } tr.appendChild(td); });
+          tb.appendChild(tr);
+        });
+        t.appendChild(tb); rs.appendChild(t);
+      });
+    }
+  }
+
+  function outlineText(n, depth) {
+    var s = new Array(depth + 1).join("  ") + "- " + label(n) + (label(n) !== shortType(n.type) ? " [" + shortType(n.type) + "]" : "") + (n.disabled ? " (disabled)" : "");
+    var c = condLabel(n); if (c) s += "  — " + clip(c, 120);
+    var kp = keyProp(n); if (kp && kp.indexOf("Condition") !== 0) s += "  (" + kp + ")";
+    var lines = [s];
+    if (n.flow) n.flow.nodes.forEach(function (f) {
+      lines.push(new Array(depth + 2).join("  ") + "#" + f.no + " " + f.kind + (f.cond ? ": " + clip(f.cond, 100) : "") + (f.next.length ? "  → " + f.next.map(function (x) { var t = n.flow.map[x.key]; return x.label + " #" + (t ? t.no : "?"); }).join(", ") : "  → end"));
+      if (f.act) lines = lines.concat(outlineText(f.act, depth + 2));
+    });
+    else childrenOf(n).forEach(function (k) { lines = lines.concat(outlineText(k, depth + 1)); });
+    return lines;
+  }
+
+  // ---------- samples (made up) ----------
+  var S3 = '<SequentialWorkflowActivity x:Class="Example.Workflows.ApplicationReview" x:Name="ApplicationReview" xmlns:ns0="clr-namespace:Example.Activities;Assembly=Example.Workflow, Version=1.0.0.0" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/workflow">' +
+    '<ns0:LoadRecordActivity x:Name="loadApplication" RecordType="Application" RecordId="{ActivityBind ApplicationReview,Path=ApplicationId}" />' +
+    '<IfElseActivity x:Name="checkStatus">' +
+      '<IfElseBranchActivity x:Name="isOffered"><IfElseBranchActivity.Condition><RuleConditionReference ConditionName="StatusIsOffer" /></IfElseBranchActivity.Condition>' +
+        '<ns0:SendEmailActivity x:Name="emailOffer" Template="OFFER_LETTER" To="{ActivityBind loadApplication,Path=Email}" />' +
+        '<ns0:UpdateFieldActivity x:Name="markOffered" Field="STATUS" Value="O" />' +
+      '</IfElseBranchActivity>' +
+      '<IfElseBranchActivity x:Name="isRejected"><IfElseBranchActivity.Condition><RuleConditionReference ConditionName="StatusIsReject" /></IfElseBranchActivity.Condition>' +
+        '<ns0:SendEmailActivity x:Name="emailReject" Template="REJECT_LETTER" To="{ActivityBind loadApplication,Path=Email}" Enabled="False" />' +
+        '<CodeActivity x:Name="logRejection" ExecuteCode="LogRejection_ExecuteCode" />' +
+      '</IfElseBranchActivity>' +
+      '<IfElseBranchActivity x:Name="otherwise"><CodeActivity x:Name="noAction" ExecuteCode="NoAction_ExecuteCode" /></IfElseBranchActivity>' +
+    '</IfElseActivity>' +
+    '<WhileActivity x:Name="forEachDocument"><WhileActivity.Condition><CodeCondition Condition="HasMoreDocuments" /></WhileActivity.Condition>' +
+      '<SequenceActivity x:Name="processDocument"><ns0:AttachDocumentActivity x:Name="attach" Folder="Applications" /><CodeActivity x:Name="nextDocument" ExecuteCode="NextDocument_ExecuteCode" /></SequenceActivity>' +
+    '</WhileActivity>' +
+    '<ns0:UpdateFieldActivity x:Name="stampReviewed" Field="REVIEWED_DATE" Value="{ActivityBind ApplicationReview,Path=Today}" />' +
+    '</SequentialWorkflowActivity>';
+  var S3R = '<RuleDefinitions xmlns="http://schemas.microsoft.com/winfx/2006/xaml/workflow"><RuleDefinitions.Conditions>' +
+    '<RuleExpressionCondition Name="StatusIsOffer"><RuleExpressionCondition.Expression>' +
+      '<ns0:CodeBinaryOperatorExpression Operator="ValueEquality" xmlns:ns0="clr-namespace:System.CodeDom;Assembly=System, Version=2.0.0.0">' +
+      '<ns0:CodeBinaryOperatorExpression.Left><ns0:CodePropertyReferenceExpression PropertyName="Status"><ns0:CodePropertyReferenceExpression.TargetObject><ns0:CodeThisReferenceExpression /></ns0:CodePropertyReferenceExpression.TargetObject></ns0:CodePropertyReferenceExpression></ns0:CodeBinaryOperatorExpression.Left>' +
+      '<ns0:CodeBinaryOperatorExpression.Right><ns0:CodePrimitiveExpression><ns0:CodePrimitiveExpression.Value><ns1:String xmlns:ns1="clr-namespace:System;Assembly=mscorlib">OFFER</ns1:String></ns0:CodePrimitiveExpression.Value></ns0:CodePrimitiveExpression></ns0:CodeBinaryOperatorExpression.Right>' +
+      '</ns0:CodeBinaryOperatorExpression></RuleExpressionCondition.Expression></RuleExpressionCondition>' +
+    '<RuleExpressionCondition Name="StatusIsReject"><RuleExpressionCondition.Expression>' +
+      '<ns0:CodeBinaryOperatorExpression Operator="BooleanAnd" xmlns:ns0="clr-namespace:System.CodeDom;Assembly=System, Version=2.0.0.0">' +
+      '<ns0:CodeBinaryOperatorExpression.Left><ns0:CodeBinaryOperatorExpression Operator="ValueEquality"><ns0:CodeBinaryOperatorExpression.Left><ns0:CodePropertyReferenceExpression PropertyName="Status"><ns0:CodePropertyReferenceExpression.TargetObject><ns0:CodeThisReferenceExpression /></ns0:CodePropertyReferenceExpression.TargetObject></ns0:CodePropertyReferenceExpression></ns0:CodeBinaryOperatorExpression.Left><ns0:CodeBinaryOperatorExpression.Right><ns0:CodePrimitiveExpression><ns0:CodePrimitiveExpression.Value><ns1:String xmlns:ns1="clr-namespace:System;Assembly=mscorlib">REJECT</ns1:String></ns0:CodePrimitiveExpression.Value></ns0:CodePrimitiveExpression></ns0:CodeBinaryOperatorExpression.Right></ns0:CodeBinaryOperatorExpression></ns0:CodeBinaryOperatorExpression.Left>' +
+      '<ns0:CodeBinaryOperatorExpression.Right><ns0:CodeBinaryOperatorExpression Operator="GreaterThan"><ns0:CodeBinaryOperatorExpression.Left><ns0:CodePropertyReferenceExpression PropertyName="DaysOpen"><ns0:CodePropertyReferenceExpression.TargetObject><ns0:CodeThisReferenceExpression /></ns0:CodePropertyReferenceExpression.TargetObject></ns0:CodePropertyReferenceExpression></ns0:CodeBinaryOperatorExpression.Left><ns0:CodeBinaryOperatorExpression.Right><ns0:CodePrimitiveExpression><ns0:CodePrimitiveExpression.Value><ns1:Int32 xmlns:ns1="clr-namespace:System;Assembly=mscorlib">14</ns1:Int32></ns0:CodePrimitiveExpression.Value></ns0:CodePrimitiveExpression></ns0:CodeBinaryOperatorExpression.Right></ns0:CodeBinaryOperatorExpression></ns0:CodeBinaryOperatorExpression.Right>' +
+      '</ns0:CodeBinaryOperatorExpression></RuleExpressionCondition.Expression></RuleExpressionCondition>' +
+    '</RuleDefinitions.Conditions></RuleDefinitions>';
+  var S4 = '<Activity mc:Ignorable="sap sap2010" x:Class="Example.EnrolmentCheck" xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:sap="http://schemas.microsoft.com/netfx/2009/xaml/activities/presentation" xmlns:sap2010="http://schemas.microsoft.com/netfx/2010/xaml/activities/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ex="clr-namespace:Example.Activities;assembly=Example.Workflow">' +
+    '<x:Members><x:Property Name="LearnerId" Type="InArgument(x:String)" /><x:Property Name="Approved" Type="OutArgument(x:Boolean)" /></x:Members>' +
+    '<sap2010:WorkflowViewState.IdRef>EnrolmentCheck_1</sap2010:WorkflowViewState.IdRef>' +
+    '<Flowchart DisplayName="Enrolment check" sap2010:WorkflowViewState.IdRef="Flowchart_1">' +
+      '<Flowchart.Variables><Variable x:TypeArguments="x:Int32" Name="Age" /><Variable x:TypeArguments="x:Boolean" Name="HasFees" /></Flowchart.Variables>' +
+      '<Flowchart.StartNode><x:Reference>__ReferenceID0</x:Reference></Flowchart.StartNode>' +
+      '<FlowStep x:Name="__ReferenceID0"><ex:GetLearnerActivity DisplayName="Load learner" LearnerId="[LearnerId]" Age="[Age]" />' +
+        '<FlowStep.Next><FlowDecision x:Name="__ReferenceID1" Condition="[Age &gt;= 19]" DisplayName="19 or over?" TrueLabel="19+" FalseLabel="16-18">' +
+          '<FlowDecision.True><FlowStep x:Name="__ReferenceID2"><ex:CheckFeesActivity DisplayName="Check fees" Result="[HasFees]" />' +
+            '<FlowStep.Next><FlowDecision x:Name="__ReferenceID3" Condition="[HasFees]" DisplayName="Fees paid?">' +
+              '<FlowDecision.True><x:Reference>__ReferenceID4</x:Reference></FlowDecision.True>' +
+              '<FlowDecision.False><FlowStep x:Name="__ReferenceID5"><Sequence DisplayName="Chase fees"><ex:SendEmailActivity DisplayName="Email learner" Template="FEES_DUE" /><Assign DisplayName="Not approved"><Assign.To><OutArgument x:TypeArguments="x:Boolean">[Approved]</OutArgument></Assign.To><Assign.Value><InArgument x:TypeArguments="x:Boolean">False</InArgument></Assign.Value></Assign></Sequence></FlowStep></FlowDecision.False>' +
+            '</FlowDecision></FlowStep.Next></FlowStep></FlowDecision.True>' +
+          '<FlowDecision.False><FlowStep x:Name="__ReferenceID4"><Assign DisplayName="Approve"><Assign.To><OutArgument x:TypeArguments="x:Boolean">[Approved]</OutArgument></Assign.To><Assign.Value><InArgument x:TypeArguments="x:Boolean">True</InArgument></Assign.Value></Assign></FlowStep></FlowDecision.False>' +
+        '</FlowDecision></FlowStep.Next></FlowStep>' +
+      '<x:Reference>__ReferenceID1</x:Reference><x:Reference>__ReferenceID2</x:Reference><x:Reference>__ReferenceID3</x:Reference><x:Reference>__ReferenceID4</x:Reference><x:Reference>__ReferenceID5</x:Reference>' +
+    '</Flowchart></Activity>';
+
+  // ---------- wiring ----------
+  function readFiles(fl) {
+    var list = Array.prototype.slice.call(fl), out = [], left = list.length;
+    if (!left) return;
+    list.forEach(function (f, i) {
+      var r = new FileReader();
+      r.onload = function () { out[i] = { name: f.name, text: decode(r.result) }; if (--left === 0) loadMany(out); };
+      r.onerror = function () { $("err").textContent = "Couldn't read " + f.name; };
+      r.readAsArrayBuffer(f);
+    });
+  }
+  function reset() { FILES = []; RULES = { conds: {}, sets: [] }; CUR = null; }
+  $("file").addEventListener("change", function () { reset(); readFiles(this.files); });
+  var drop = $("drop");
+  ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+  drop.addEventListener("drop", function (e) { reset(); readFiles(e.dataTransfer.files); });
+  $("s3").addEventListener("click", function () { reset(); loadMany([{ name: "ApplicationReview.xoml", text: S3 }, { name: "ApplicationReview.rules", text: S3R }]); });
+  $("s4").addEventListener("click", function () { reset(); loadMany([{ name: "EnrolmentCheck.xaml", text: S4 }]); });
+  $("pasteToggle").addEventListener("click", function () { $("pasteWrap").hidden = !$("pasteWrap").hidden; });
+  $("pasteBtn").addEventListener("click", function () {
+    var t = $("paste").value; var isRules = /<RuleDefinitions/.test(t);
+    loadMany([{ name: isRules ? "pasted.rules" : "pasted workflow", text: t }]);
+  });
+  $("find").addEventListener("input", doFind);
+  $("fit").addEventListener("change", fit);
+  $("find").addEventListener("keydown", function (e) { if (e.key === "Enter" && hits.length) { hitAt = (hitAt + 1) % hits.length; select(hits[hitAt], true); } });
+  var hand = window.BITK && BITK.take();
+  if (hand && hand.tool === "wf" && hand.files) { reset(); loadMany(hand.files); }
+  $("expAll").addEventListener("click", function () { document.querySelectorAll("#outline li.closed").forEach(function (li) { li.classList.remove("closed"); li.querySelector(".tg").textContent = "▾"; }); });
+  $("colAll").addEventListener("click", function () { document.querySelectorAll("#outline li").forEach(function (li) { if (li.querySelector("ul") && li.parentNode.parentNode.id !== "outline") { li.classList.add("closed"); li.querySelector(".tg").textContent = "▸"; } }); });
+  $("copyOutline").addEventListener("click", function () {
+    if (!CUR || !CUR.model || !navigator.clipboard) return;
+    var b = this; navigator.clipboard.writeText(outlineText(CUR.model, 0).join("\n")).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy outline"; }, 1200); });
+  });
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>

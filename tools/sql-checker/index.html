@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL Checker · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  #sql { min-height: 300px; font-size: 13px; line-height: 1.5; tab-size: 4; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; align-items: center; }
+  #banned { min-height: 70px; width: 260px; }
+  .find .src { font-family: var(--mono); font-size: 12px; background: var(--panel); border-radius: 6px; padding: 6px 10px; margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
+  .find .src mark { background: var(--warn-bg); color: var(--warn-text); border-radius: 2px; }
+  .rules td:first-child { white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SQL Checker</h1>
+  <p class="lead">Paste a T-SQL query to catch common logic bugs, performance traps and things the EBS Central query validator rejects. Checks run in your browser as you type.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li>Paste a query into the box. Checks run as you type.</li>
+      <li>Results are <strong>errors</strong> (almost always wrong), <strong>warnings</strong> (often wrong, check them) and <strong>tips</strong> (performance or style). Untick <strong>Show tips</strong> to hide tips.</li>
+      <li>Click a result to highlight that spot in your query. Most results show a suggested fix underneath.</li>
+      <li>For EBS Central screens, keep <strong>EBS mode</strong> on. When the validator rejects something new, add it to the list and it will be flagged from then on.</li>
+      <li>It's a pattern checker, not a full SQL parser, so treat each hit as a question to check rather than a certain bug.</li>
+    </ol>
+    <p>Click <strong>Load sample</strong> to see each kind of result.</p>
+  </details>
+
+  <textarea id="sql" spellcheck="false" placeholder="Paste a query here"></textarea>
+  <div class="opts">
+    <button id="sampleBtn">Load sample</button>
+    <button id="clearBtn">Clear</button>
+    <button id="erdBtn">Show joins (Query ERD)</button>
+    <label class="inline"><input type="checkbox" id="showInfo" checked> Show tips</label>
+    <label class="inline"><input type="checkbox" id="ebs" checked> EBS mode</label>
+  </div>
+  <div class="field" id="bannedWrap" style="margin-top:10px">
+    <label for="banned">EBS validator rejects (one per line, saved in this browser)</label>
+    <textarea id="banned" spellcheck="false"></textarea>
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <div id="out"></div>
+
+  <details>
+    <summary>What it checks</summary>
+    <table class="rules">
+      <tbody>
+        <tr><td><span class="sev error">error</span></td><td><code>= NULL</code> or <code>&lt;&gt; NULL</code> in a condition. Never true. Use <code>IS NULL</code>.</td></tr>
+        <tr><td><span class="sev error">error</span></td><td>EBS mode: anything on your rejects list, e.g. <code>OUTER APPLY</code>, <code>STRING_AGG</code>, with a rewrite that the validator accepts.</td></tr>
+        <tr><td><span class="sev warn">warn</span></td><td><code>AND</code> and <code>OR</code> at the same level with no brackets.</td></tr>
+        <tr><td><span class="sev warn">warn</span></td><td><code>EXISTS</code> subquery that never refers to the outer query.</td></tr>
+        <tr><td><span class="sev warn">warn</span></td><td><code>NOT IN (SELECT ...)</code>. One NULL makes it return nothing.</td></tr>
+        <tr><td><span class="sev warn">warn</span></td><td>A <code>LEFT JOIN</code> table filtered in <code>WHERE</code>. This makes it an inner join.</td></tr>
+        <tr><td><span class="sev warn">warn</span></td><td>Integer division with <code>COUNT</code>, e.g. percentages that come out as 0.</td></tr>
+        <tr><td><span class="sev warn">warn</span></td><td><code>TOP</code> with no <code>ORDER BY</code>. Which rows you get is random.</td></tr>
+        <tr><td><span class="sev warn">warn</span></td><td>Dates like <code>'01/08/2026'</code>. Day/month order depends on login language.</td></tr>
+        <tr><td><span class="sev info">tip</span></td><td><code>'2026-08-01'</code> with <code>datetime</code> under British settings, <code>BETWEEN</code> with date-only ends, functions on columns in <code>WHERE</code>/<code>ON</code>, leading <code>%</code> in <code>LIKE</code>, <code>SELECT *</code>, <code>DISTINCT</code>, <code>UNION</code> without <code>ALL</code>, <code>NOLOCK</code>, comma joins.</td></tr>
+      </tbody>
+    </table>
+    <p class="meta">This is a pattern checker, not a full SQL parser. It can miss things and can flag something you meant to do. Treat each hit as a question to check.</p>
+  </details>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var STORE = "bitk.sqlchecker.v1";
+
+  var KW = {};
+  ("ADD ALL ALTER AND ANY APPLY AS ASC BEGIN BETWEEN BREAK BY CASCADE CASE CHECK CLOSE COLLATE COLUMN COMMIT CONSTRAINT " +
+   "CONTINUE CREATE CROSS CURRENT CURSOR DECLARE DEFAULT DELETE DESC DISTINCT DROP ELSE END ESCAPE EXCEPT EXEC EXECUTE EXISTS " +
+   "FETCH FOR FOREIGN FROM FULL FUNCTION GO GOTO GRANT GROUP HAVING IF IN INDEX INNER INSERT INTERSECT INTO IS JOIN KEY LEFT LIKE " +
+   "MERGE NOCHECK NOLOCK NOT NULL OF OFF ON OPEN OPTION OR ORDER OUTER OVER PARTITION PERCENT PIVOT PRIMARY PRINT PROCEDURE PROC RAISERROR " +
+   "REFERENCES RETURN RETURNS RIGHT ROLLBACK ROWS SELECT SET TABLE THEN TIES TO TOP TRAN TRANSACTION TRUNCATE TRY CATCH UNION UNIQUE " +
+   "UNPIVOT UPDATE USE VALUES VIEW WHEN WHERE WHILE WITH WITHIN").split(" ").forEach(function (w) { KW[w] = 1; });
+  var DATEPARTS = {};
+  "YEAR YY YYYY QUARTER QQ Q MONTH MM M DAYOFYEAR DY Y DAY DD D WEEK WK WW WEEKDAY DW HOUR HH MINUTE MI N SECOND SS S MILLISECOND MS ISO_WEEK ISOWK ISOWW".split(" ").forEach(function (w) { DATEPARTS[w] = 1; });
+  var SARG = {};
+  "YEAR MONTH DAY DATEPART DATENAME DATEADD DATEDIFF EOMONTH CONVERT CAST TRY_CAST TRY_CONVERT ISNULL COALESCE LEFT RIGHT SUBSTRING UPPER LOWER LTRIM RTRIM TRIM REPLACE FORMAT CONCAT LEN".split(" ").forEach(function (w) { SARG[w] = 1; });
+  var COND = { WHERE: 1, ON: 1, HAVING: 1, WHEN: 1 };
+  var STMT = {};
+  "INSERT UPDATE DELETE MERGE DECLARE IF WHILE BEGIN RETURN EXEC EXECUTE PRINT TRUNCATE CREATE ALTER DROP GO USE".split(" ").forEach(function (w) { STMT[w] = 1; });
+  var JOINW = { JOIN: 1, INNER: 1, LEFT: 1, RIGHT: 1, FULL: 1, CROSS: 1, OUTER: 1, APPLY: 1 };
+
+  var FIXES = {
+    "OUTER APPLY": "Swap each column you need for a correlated scalar subquery:\n  (SELECT TOP 1 x.Col FROM dbo.X x WHERE x.Key = p.Key ORDER BY x.Date DESC) AS Col\nOr rank rows in a derived table with ROW_NUMBER() OVER (PARTITION BY Key ORDER BY ...) AS rn,\nthen LEFT JOIN to it ON ... AND rn = 1.",
+    "CROSS APPLY": "Same fixes as OUTER APPLY: a correlated scalar subquery per column, or a ROW_NUMBER() derived table with an INNER JOIN on rn = 1.",
+    "STRING_AGG": "Older pattern (check the validator accepts FOR XML):\n  STUFF((SELECT ', ' + x.Col FROM dbo.X x WHERE x.Key = p.Key\n         FOR XML PATH(''), TYPE).value('.', 'nvarchar(max)'), 1, 2, '')"
+  };
+
+  // ---------- Tokenizer ----------
+  function tokenize(s) {
+    var T = [], i = 0, n = s.length;
+    function push(t, v, st, u) { T.push({ t: t, v: v, u: u !== undefined ? u : v.toUpperCase(), s: st, e: i }); }
+    while (i < n) {
+      var c = s[i], st = i;
+      if (/\s/.test(c)) { i++; continue; }
+      if (c === "-" && s[i + 1] === "-") { while (i < n && s[i] !== "\n") i++; continue; }
+      if (c === "/" && s[i + 1] === "*") {
+        var d = 1; i += 2;
+        while (i < n && d > 0) { if (s[i] === "/" && s[i + 1] === "*") { d++; i += 2; } else if (s[i] === "*" && s[i + 1] === "/") { d--; i += 2; } else i++; }
+        continue;
+      }
+      if (c === "'" || ((c === "N" || c === "n") && s[i + 1] === "'")) {
+        if (c !== "'") i++;
+        i++; var v = "";
+        while (i < n) { if (s[i] === "'") { if (s[i + 1] === "'") { v += "'"; i += 2; continue; } i++; break; } v += s[i++]; }
+        push("str", v, st, v); continue;
+      }
+      if (c === "[") {
+        i++; var b = "";
+        while (i < n) { if (s[i] === "]") { if (s[i + 1] === "]") { b += "]"; i += 2; continue; } i++; break; } b += s[i++]; }
+        push("id", b, st); continue;
+      }
+      if (c === '"') { i++; var q = ""; while (i < n && s[i] !== '"') q += s[i++]; i++; push("id", q, st); continue; }
+      if (/[0-9]/.test(c) || (c === "." && /[0-9]/.test(s[i + 1] || ""))) {
+        var m = /^(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/.exec(s.slice(i, i + 60));
+        i += m[0].length; push("num", m[0], st); continue;
+      }
+      if (/[A-Za-z_@#À-￿]/.test(c)) {
+        while (i < n && /[\w@#$À-￿]/.test(s[i])) i++;
+        var w = s.slice(st, i);
+        push(w[0] === "@" ? "var" : "word", w, st); continue;
+      }
+      var two = s.substr(i, 2);
+      if (["<=", ">=", "<>", "!=", "!<", "!>", "::", "+=", "-=", "*=", "/="].indexOf(two) >= 0) { i += 2; push("op", two, st); continue; }
+      i++; push("op", c, st);
+    }
+    return T;
+  }
+
+  function matchParens(T) {
+    var M = {}, stack = [];
+    T.forEach(function (t, i) {
+      if (t.v === "(" && t.t === "op") stack.push(i);
+      else if (t.v === ")" && t.t === "op" && stack.length) { var o = stack.pop(); M[o] = i; M[i] = o; }
+    });
+    return M;
+  }
+
+  // ---------- Analyse ----------
+  function analyse(src, opts) {
+    var T = tokenize(src), M = matchParens(T), F = [];
+    function add(sev, i, j, title, msg, fix) {
+      F.push({ sev: sev, s: T[i].s, e: T[j === undefined ? i : j].e, title: title, msg: msg, fix: fix || "" });
+    }
+    function W(i) { return T[i] && (T[i].t === "word" || T[i].t === "id") ? T[i].u : ""; }
+    function V(i) { return T[i] && T[i].t === "op" ? T[i].v : ""; }
+    function isName(t) { return t && (t.t === "id" || (t.t === "word" && !KW[t.u])); }
+    function isCmp(i) { var v = V(i), w = T[i] && T[i].t === "word" ? T[i].u : ""; return ["=", "<", ">", "<=", ">=", "<>", "!=", "!<", "!>"].indexOf(v) >= 0 || w === "LIKE" || w === "IN" || w === "BETWEEN" || w === "IS"; }
+
+    function readObject(k) {
+      var parts = [], name = null, alias = null;
+      if (!T[k]) return null;
+      if (V(k) === "(" && M[k] !== undefined) k = M[k] + 1;
+      else if (isName(T[k])) {
+        parts.push(k); name = T[k].u; k++;
+        while (V(k) === ".") { parts.push(k); k++; if (isName(T[k])) { parts.push(k); name = T[k].u; k++; } }
+        if (V(k) === "(" && M[k] !== undefined) k = M[k] + 1;
+      } else return null;
+      if (W(k) === "AS") k++;
+      if (isName(T[k]) && !JOINW[T[k].u]) { alias = T[k].u; parts.push(k); k++; }
+      return { name: name, alias: alias, parts: parts, end: k };
+    }
+
+    var root = { kind: "root", clause: "", isCond: false, inWhere: false, inWO: false, ands: [], ors: [], btw: 0, left: {}, flagged: {}, top: null, hasOrder: false, exists: false };
+    root.scope = root;
+    var st = [root];
+    function cur() { return st[st.length - 1]; }
+    function condF(f) { return COND[f.clause] || (f.isCond && f.clause === ""); }
+
+    function finSeg(f) {
+      if (f.ands.length && f.ors.length) {
+        add("warn", f.ors[0], f.ors[0], "AND and OR mixed without brackets",
+          "SQL does AND before OR, so  a AND b OR c  means  (a AND b) OR c. If the OR is meant to be one option inside the filter, wrap it in brackets.",
+          "WHERE x = 1 AND (y = 2 OR y IS NULL)");
+      }
+      f.ands = []; f.ors = []; f.btw = 0;
+    }
+    function finSel(f) {
+      if (f.top !== null && !f.hasOrder && !f.exists) {
+        add("warn", f.top, f.top, "TOP without ORDER BY", "Without ORDER BY, SQL Server can return any rows it likes, and it can change between runs.", "SELECT TOP 1 ... ORDER BY x.StartDate DESC");
+      }
+      f.top = null; f.hasOrder = false;
+    }
+    function setClause(f, c) { finSeg(f); f.clause = c; }
+
+    for (var i = 0; i < T.length; i++) {
+      var t = T[i], f = cur(), u = t.t === "word" ? t.u : "";
+
+      if (t.t === "op" && t.v === "(") {
+        var firstW = W(i + 1);
+        var isSel = firstW === "SELECT" || firstW === "WITH";
+        var parentCond = condF(f);
+        var nf = {
+          kind: "paren", clause: "", isCond: !isSel && parentCond, ands: [], ors: [], btw: 0, left: {}, flagged: {}, top: null, hasOrder: false,
+          exists: W(i - 1) === "EXISTS",
+          inWhere: !isSel && (f.clause === "WHERE" || f.inWhere),
+          inWO: !isSel && (f.clause === "WHERE" || f.clause === "ON" || f.inWO)
+        };
+        nf.scope = isSel ? nf : f.scope;
+        st.push(nf); continue;
+      }
+      if (t.t === "op" && t.v === ")") {
+        if (st.length > 1 && cur().kind === "paren") { finSeg(f); finSel(f); st.pop(); }
+        continue;
+      }
+      if (u === "CASE") {
+        st.push({ kind: "case", clause: "", isCond: false, ands: [], ors: [], btw: 0, left: {}, flagged: {}, top: null, hasOrder: false, exists: false,
+          inWhere: f.clause === "WHERE" || f.inWhere, inWO: f.clause === "WHERE" || f.clause === "ON" || f.inWO, scope: f.scope });
+        continue;
+      }
+      if (u === "END" && f.kind === "case") { finSeg(f); st.pop(); continue; }
+      if (t.t === "op" && t.v === ";") { finSel(f); setClause(f, "STMT"); continue; }
+
+      // Clause keywords at this level
+      if (u === "SELECT") {
+        finSel(f); setClause(f, "SELECT"); f.left = {};
+        var k = i + 1;
+        if (W(k) === "DISTINCT") {
+          add("info", k, k, "DISTINCT", "Fine if you mean it. If it's there to remove duplicate rows, check for a join that fans out (one row joining to many) first.");
+          k++;
+        } else if (W(k) === "ALL") k++;
+        if (W(k) === "TOP") {
+          f.top = k; k++;
+          if (V(k) === "(" && M[k] !== undefined) k = M[k] + 1; else k++;
+          if (W(k) === "PERCENT") k++;
+          if (W(k) === "WITH" && W(k + 1) === "TIES") k += 2;
+        }
+        if (V(k) === "*" && !f.exists) add("info", k, k, "SELECT *", "Lists every column. Name the columns you need so the query doesn't break or slow down when the table changes.");
+        continue;
+      }
+      if (u === "UNION" || u === "EXCEPT" || u === "INTERSECT") {
+        finSel(f); setClause(f, "UNION");
+        if (u === "UNION" && W(i + 1) !== "ALL") add("info", i, i, "UNION without ALL", "UNION removes duplicate rows, which costs a sort. Use UNION ALL unless you need that.");
+        continue;
+      }
+      if (u === "ORDER" && W(i + 1) === "BY") { f.hasOrder = true; setClause(f, "ORDER"); continue; }
+      if (u === "GROUP" && W(i + 1) === "BY") { setClause(f, "GROUP"); continue; }
+      if (u === "FROM" || u === "WHERE" || u === "HAVING" || u === "ON" || u === "SET" || u === "INTO" || u === "VALUES" || u === "WITH") {
+        if (!(u === "WITH" && V(i + 1) === "(")) setClause(f, u);
+        continue;
+      }
+      if (f.kind === "case" && (u === "WHEN" || u === "THEN" || u === "ELSE")) { setClause(f, u); continue; }
+      if (STMT[u]) { finSel(f); setClause(f, "STMT"); continue; }
+      if (JOINW[u]) {
+        if (u === "LEFT") {
+          var j = i + 1; if (W(j) === "OUTER") j++;
+          if (W(j) === "JOIN") { var r = readObject(j + 1); if (r) { var a = r.alias || r.name; if (a) f.left[a] = 1; } }
+        }
+        if (f.clause !== "JOIN") setClause(f, "JOIN");
+        continue;
+      }
+
+      // AND / OR / BETWEEN at this level
+      if (condF(f)) {
+        if (u === "BETWEEN") { f.btw++; }
+        else if (u === "AND") { if (f.btw > 0) f.btw--; else f.ands.push(i); }
+        else if (u === "OR") { f.ors.push(i); }
+      }
+
+      // = NULL
+      if (condF(f) && ["=", "<>", "!="].indexOf(V(i)) >= 0 && W(i + 1) === "NULL") {
+        add("error", i, i + 1, V(i) + " NULL is never true", "Comparing with NULL gives unknown, so the row is always dropped. Use IS NULL or IS NOT NULL.", V(i) === "=" ? "x.Col IS NULL" : "x.Col IS NOT NULL");
+      }
+
+      // LEFT JOIN table filtered in WHERE
+      if ((f.clause === "WHERE" || f.inWhere) && (t.t === "word" || t.t === "id") && V(i + 1) === "." && T[i + 2] && (T[i + 2].t === "word" || T[i + 2].t === "id")) {
+        var sc = f.scope, q = t.u;
+        if (sc.left[q] && !sc.flagged[q]) {
+          var after = i + 3;
+          if (!(W(after) === "IS" && W(after + 1) === "NULL")) {
+            sc.flagged[q] = 1;
+            add("warn", i, i + 2, "LEFT JOIN turned into an inner join",
+              q.toLowerCase() + " is LEFT JOINed, but filtering its columns in WHERE drops the rows where it didn't match. Move the filter into the ON clause to keep them, or use INNER JOIN if dropping them is intended.",
+              "LEFT JOIN X " + q.toLowerCase() + " ON " + q.toLowerCase() + ".Key = p.Key AND " + q.toLowerCase() + "." + T[i + 2].v + " = ...");
+          }
+        }
+      }
+
+      // Function on a column in WHERE / ON
+      if (t.t === "word" && SARG[u] && V(i + 1) === "(" && M[i + 1] !== undefined && (f.clause === "WHERE" || f.clause === "ON" || (f.kind !== "root" && f.inWO && f.scope !== f))) {
+        var close = M[i + 1], hasCol = false;
+        for (var g = i + 2; g < close; g++) {
+          var tg = T[g];
+          if ((tg.t === "id" || tg.t === "word") && V(g - 1) === "." ) { hasCol = true; break; }
+          if (tg.t === "id" && V(g + 1) !== ".") { hasCol = true; break; }
+          if (tg.t === "word" && !KW[tg.u] && !DATEPARTS[tg.u] && V(g + 1) !== "(" && V(g + 1) !== "." && !/^(INT|BIGINT|SMALLINT|TINYINT|DATE|DATETIME|DATETIME2|SMALLDATETIME|VARCHAR|NVARCHAR|CHAR|NCHAR|DECIMAL|NUMERIC|FLOAT|REAL|MONEY|BIT|TIME|MAX)$/.test(tg.u)) { hasCol = true; break; }
+        }
+        if (hasCol && (isCmp(close + 1) || isCmp(i - 1))) {
+          add("info", i, close, "Function on a column in " + (f.clause === "ON" || (!f.inWhere && f.inWO) ? "ON" : "WHERE"),
+            "Wrapping a column in " + u + "() stops SQL Server using an index on it, so it scans every row. Put the function on the other side if you can.",
+            u === "YEAR" ? "WHERE d.Col >= '20260101' AND d.Col < '20270101'" : "");
+          i = close; continue;
+        }
+      }
+
+      // LIKE '%...'
+      if (u === "LIKE" && T[i + 1] && T[i + 1].t === "str" && /^%/.test(T[i + 1].v)) {
+        add("info", i + 1, i + 1, "LIKE with a leading %", "A pattern that starts with % can't use an index, so every row is checked. Fine on small tables.");
+      }
+
+      // NOT IN (SELECT
+      if (u === "NOT" && W(i + 1) === "IN" && V(i + 2) === "(" && W(i + 3) === "SELECT") {
+        add("warn", i, i + 1, "NOT IN with a subquery", "If the subquery returns even one NULL, NOT IN returns no rows at all. NOT EXISTS doesn't have this problem.",
+          "AND NOT EXISTS (SELECT 1 FROM dbo.X x WHERE x.Key = p.Key)");
+      }
+
+      // EXISTS correlation
+      if (u === "EXISTS" && V(i + 1) === "(" && M[i + 1] !== undefined) checkExists(i, i + 1, M[i + 1]);
+
+      // Integer division
+      if (V(i) === "/" ) checkDiv(i);
+
+      // Comma join
+      if (V(i) === "," && f.clause === "FROM" && !f.comma) {
+        f.comma = 1;
+        add("info", i, i, "Comma join", "Old-style FROM a, b joins. Easy to lose a join condition and get every row matched to every row. Use explicit JOIN ... ON.");
+      }
+
+      if (u === "NOLOCK") add("info", i, i, "NOLOCK", "Can read uncommitted data and skip or double-count rows while the table is changing. OK for rough numbers, risky for reports people act on.");
+
+      // Date literals
+      if (t.t === "str") checkDate(i);
+      if (u === "BETWEEN" && T[i + 1] && T[i + 1].t === "str" && W(i + 2) === "AND" && T[i + 3] && T[i + 3].t === "str" && /^\s*(\d{8}|\d{4}-\d{2}-\d{2}|\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s*$/.test(T[i + 3].v)) {
+        add("info", i, i + 3, "BETWEEN with a date-only end", "If the column holds times, BETWEEN ... AND '" + T[i + 3].v + "' stops at midnight and misses the rest of that day. Use >= start AND < the day after.",
+          "WHERE x.Col >= '20260801' AND x.Col < '20270801'");
+      }
+    }
+    // close everything
+    while (st.length) { var ff = st.pop(); finSeg(ff); finSel(ff); }
+
+    // EBS banned list
+    if (opts.ebs) {
+      opts.banned.forEach(function (phrase) {
+        var words = phrase.toUpperCase().split(/\s+/).filter(Boolean);
+        if (!words.length) return;
+        for (var a = 0; a < T.length; a++) {
+          var ok = true;
+          for (var b = 0; b < words.length; b++) { if (!T[a + b] || T[a + b].u !== words[b] || T[a + b].t === "str") { ok = false; break; } }
+          if (ok) add("error", a, a + words.length - 1, "EBS validator rejects " + words.join(" "), "EBS Central's query validator won't accept this.", FIXES[words.join(" ")] || "");
+        }
+      });
+    }
+
+    function checkExists(i, o, c) {
+      var defined = {}, objIdx = {}, quals = {}, any = false;
+      for (var k = o + 1; k < c; k++) {
+        var w = W(k);
+        if (w === "FROM" || w === "JOIN" || w === "APPLY") {
+          var r = readObject(k + 1);
+          if (r) { r.parts.forEach(function (p) { objIdx[p] = 1; }); if (r.alias) defined[r.alias] = 1; if (r.name) defined[r.name] = 1; }
+        }
+      }
+      for (k = o + 1; k < c; k++) {
+        if (objIdx[k]) continue;
+        if ((T[k].t === "word" || T[k].t === "id") && V(k + 1) === "." && T[k + 2] && (T[k + 2].t === "word" || T[k + 2].t === "id")) { quals[T[k].u] = 1; any = true; }
+      }
+      var outer = Object.keys(quals).filter(function (q) { return !defined[q]; });
+      if (!outer.length) {
+        add("warn", i, i, "EXISTS doesn't refer to the outer query",
+          (any ? "Every column inside uses the subquery's own tables." : "No column inside is tied to a table.") +
+          " If nothing links it to the outer row, EXISTS is true for every row (or none), so it isn't filtering per row.",
+          "EXISTS (SELECT 1 FROM dbo.X x WHERE x.Key = p.Key AND ...)");
+      }
+    }
+
+    function checkDiv(i) {
+      function grp(k, dir) { // return [start,end] of operand next to '/'
+        if (dir > 0) {
+          if ((T[k] && T[k].t === "word") && V(k + 1) === "(" && M[k + 1] !== undefined) return [k, M[k + 1]];
+          if (V(k) === "(" && M[k] !== undefined) return [k, M[k]];
+          return [k, k];
+        }
+        if (V(k) === ")" && M[k] !== undefined) { var s = M[k]; if (T[s - 1] && T[s - 1].t === "word") s--; return [s, k]; }
+        return [k, k];
+      }
+      function hasCount(r) { for (var k = r[0]; k <= r[1]; k++) if (T[k] && (T[k].u === "COUNT" || T[k].u === "COUNT_BIG")) return true; return false; }
+      var L = grp(i - 1, -1), R = grp(i + 1, 1);
+      if (!hasCount(L) && !hasCount(R)) return;
+      var BOUND = { SELECT: 1, AS: 1, WHERE: 1, AND: 1, OR: 1, THEN: 1, ELSE: 1, WHEN: 1, END: 1, FROM: 1, ON: 1, HAVING: 1, BY: 1 };
+      var s = i - 1;
+      while (s >= 0) {
+        if (V(s) === ")") { s = M[s] - 1; continue; }
+        if (V(s) === "(" || V(s) === "," || isCmp(s) || (T[s].t === "word" && BOUND[T[s].u])) break;
+        s--;
+      }
+      var e = i + 1;
+      while (e < T.length) {
+        if (V(e) === "(" && M[e] !== undefined) { e = M[e] + 1; continue; }
+        if (V(e) === ")" || V(e) === "," || isCmp(e) || (T[e].t === "word" && BOUND[T[e].u])) break;
+        e++;
+      }
+      for (var k = s + 1; k < e; k++) {
+        if (T[k].t === "num" && /[.eE]/.test(T[k].v)) return;
+        if (/^(DECIMAL|NUMERIC|FLOAT|REAL|MONEY)$/.test(T[k].u)) return;
+      }
+      add("warn", i, i, "Integer division", "COUNT returns a whole number, and whole number / whole number drops the remainder, so 45 / 50 gives 0. Multiply by 100.0 or CAST to decimal first.",
+        "100.0 * COUNT(x.Col) / NULLIF(COUNT(*), 0)");
+    }
+
+    function checkDate(i) {
+      var v = T[i].v;
+      if (/^\s*\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}(\s|$)/.test(v)) {
+        add("warn", i, i, "Ambiguous date '" + v + "'", "Whether this is day/month or month/day depends on the login's language and DATEFORMAT. Use 'YYYYMMDD', which is always read the same way.", "'" + isoGuess(v) + "'");
+      } else if (/^\s*\d{4}-\d{2}-\d{2}(\s|$)/.test(v)) {
+        add("info", i, i, "Date '" + v + "'", "Safe for date and datetime2 columns. With datetime or smalldatetime under British English settings, SQL Server reads it as year-day-month. 'YYYYMMDD' is safe everywhere.", "'" + v.trim().slice(0, 10).replace(/-/g, "") + v.trim().slice(10) + "'");
+      }
+    }
+    function isoGuess(v) {
+      var m = /^\s*(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/.exec(v);
+      var y = m[3].length === 2 ? "20" + m[3] : m[3];
+      return y + ("0" + m[2]).slice(-2) + ("0" + m[1]).slice(-2) + "  (if it's day/month/year)";
+    }
+
+    F.sort(function (a, b) { return a.s - b.s; });
+    return F;
+  }
+
+  // ---------- UI ----------
+  var SAMPLE = [
+    "-- Sample with some common mistakes (made-up columns)",
+    "SELECT DISTINCT p.PERSON_CODE, p.SURNAME,",
+    "       COUNT(pu.ID) * 100 / NULLIF(COUNT(*), 0) AS Pct,",
+    "       la.AIM_TYPE",
+    "FROM PEOPLE p",
+    "JOIN PEOPLE_UNITS pu ON pu.PERSON_CODE = p.PERSON_CODE",
+    "LEFT JOIN LEARNER_AIMS la ON la.PEOPLE_UNITS_ID = pu.ID",
+    "OUTER APPLY (SELECT TOP 1 v.VERIFIER_ID FROM VERIFIERS v",
+    "             WHERE v.PERSON_CODE = p.PERSON_CODE) ver",
+    "WHERE pu.STATUS = 'A' AND p.AVAILABILITY_CODE = 'U' OR p.AVAILABILITY_CODE IS NULL",
+    "  AND la.AIM_TYPE = 'M'",
+    "  AND YEAR(pu.START_DATE) = 2026",
+    "  AND pu.END_DATE > '01/08/2026'",
+    "  AND p.PERSON_CODE NOT IN (SELECT s.PERSON_CODE FROM STAFF s)",
+    "  AND EXISTS (SELECT 1 FROM UT_PEOPLE_LS_SUPPORT ls WHERE ls.ACTIVE = 'Y')",
+    "  AND p.NI_NUMBER = NULL",
+    "GROUP BY p.PERSON_CODE, p.SURNAME, la.AIM_TYPE;"
+  ].join("\n");
+
+  function lineInfo(src, pos) {
+    var before = src.slice(0, pos), line = before.split("\n").length;
+    var ls = before.lastIndexOf("\n") + 1, le = src.indexOf("\n", pos); if (le < 0) le = src.length;
+    return { line: line, ls: ls, le: le, col: pos - ls + 1 };
+  }
+
+  function render() {
+    var src = $("sql").value, out = $("out"), sum = $("summary");
+    out.innerHTML = ""; sum.innerHTML = "";
+    if (!src.trim()) return;
+    var banned = $("banned").value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var F;
+    try { F = analyse(src, { ebs: $("ebs").checked, banned: banned }); }
+    catch (e) { sum.textContent = "Couldn't read this query: " + e.message; return; }
+    var counts = { error: 0, warn: 0, info: 0 };
+    F.forEach(function (f) { counts[f.sev]++; });
+    var showInfo = $("showInfo").checked;
+    [["error", "errors"], ["warn", "warnings"], ["info", "tips"]].forEach(function (x) {
+      if (!counts[x[0]]) return;
+      var p = document.createElement("span"); p.className = "pill " + x[0]; p.textContent = counts[x[0]] + " " + (counts[x[0]] === 1 ? x[1].replace(/s$/, "") : x[1]); sum.appendChild(p);
+    });
+    if (!F.length) { var ok = document.createElement("span"); ok.className = "pill ok"; ok.textContent = "Nothing found"; sum.appendChild(ok); }
+
+    F.filter(function (f) { return showInfo || f.sev !== "info"; }).forEach(function (f) {
+      var li = lineInfo(src, f.s);
+      var d = document.createElement("div"); d.className = "find is-" + f.sev;
+      var hd = document.createElement("div"); hd.className = "hd";
+      var sv = document.createElement("span"); sv.className = "sev " + f.sev; sv.textContent = f.sev === "info" ? "tip" : f.sev;
+      var ln = document.createElement("span"); ln.className = "ln"; ln.textContent = "Line " + li.line;
+      var ti = document.createElement("span"); ti.className = "t"; ti.textContent = f.title;
+      hd.appendChild(sv); hd.appendChild(ln); hd.appendChild(ti); d.appendChild(hd);
+      var m = document.createElement("div"); m.className = "m"; m.textContent = f.msg; d.appendChild(m);
+      var srcEl = document.createElement("div"); srcEl.className = "src";
+      var lineText = src.slice(li.ls, li.le), a = f.s - li.ls, b = Math.min(f.e, li.le) - li.ls;
+      srcEl.appendChild(document.createTextNode(lineText.slice(0, a)));
+      var mk = document.createElement("mark"); mk.textContent = lineText.slice(a, b); srcEl.appendChild(mk);
+      srcEl.appendChild(document.createTextNode(lineText.slice(b)));
+      d.appendChild(srcEl);
+      if (f.fix) { var pr = document.createElement("pre"); pr.textContent = f.fix; d.appendChild(pr); }
+      d.addEventListener("click", function () {
+        var ta = $("sql"); ta.focus(); ta.setSelectionRange(f.s, f.e);
+        var lh = parseFloat(getComputedStyle(ta).lineHeight) || 19; ta.scrollTop = Math.max(0, (li.line - 4) * lh);
+      });
+      out.appendChild(d);
+    });
+  }
+
+  function save() { try { localStorage.setItem(STORE, JSON.stringify({ banned: $("banned").value, ebs: $("ebs").checked, info: $("showInfo").checked })); } catch (e) {} }
+  var timer;
+  function soon() { clearTimeout(timer); timer = setTimeout(render, 250); }
+
+  $("banned").value = "OUTER APPLY\nSTRING_AGG";
+  try {
+    var s = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (s) { if (typeof s.banned === "string") $("banned").value = s.banned; $("ebs").checked = s.ebs !== false; $("showInfo").checked = s.info !== false; }
+  } catch (e) {}
+  $("bannedWrap").hidden = !$("ebs").checked;
+
+  $("sql").addEventListener("input", soon);
+  $("banned").addEventListener("input", function () { save(); soon(); });
+  $("ebs").addEventListener("change", function () { $("bannedWrap").hidden = !$("ebs").checked; save(); render(); });
+  $("showInfo").addEventListener("change", function () { save(); render(); });
+  $("sampleBtn").addEventListener("click", function () { $("sql").value = SAMPLE; render(); });
+  $("erdBtn").addEventListener("click", function () { var q = $("sql").value; if (q.trim() && window.BITK && BITK.give({ tool: "erd", files: [{ name: "query.sql", text: q }] })) window.open("../query-erd/index.html", "_blank"); });
+  $("clearBtn").addEventListener("click", function () { $("sql").value = ""; render(); $("sql").focus(); });
+  var hand = window.BITK && BITK.take();
+  if (hand && hand.tool === "sql" && hand.files && hand.files[0]) { $("sql").value = hand.files[0].text; render(); }
+  $("sql").addEventListener("keydown", function (e) {
+    if (e.key === "Tab") { e.preventDefault(); var ta = this, a = ta.selectionStart; ta.setRangeText("    ", a, ta.selectionEnd, "end"); soon(); }
+  });
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>
