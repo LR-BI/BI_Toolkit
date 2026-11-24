@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random Password Generator · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  .pw { font-family: var(--mono); font-size: 26px; font-weight: 600; word-break: break-all; }
+  #list td { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Random Password Generator</h1>
+  <p class="lead">Easy-to-read passwords in the form Colour + Animal + number + symbol, e.g. <code>TealWombat482!</code>.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li>A password is ready when the page opens. Click <strong>New password</strong> for another, and <strong>Copy</strong> to copy it.</li>
+      <li>The symbol at the end comes from the <strong>Safe set</strong> by default. Use <strong>Full UK set</strong> for every keyboard symbol, edit the list by hand, or untick <strong>Add a symbol</strong>.</li>
+      <li>Need several? Enter a number under <strong>Batch</strong>, click <strong>Generate</strong>, then <strong>Copy all</strong>. They paste into Excel one per row.</li>
+      <li>These are meant for first logins that must be changed, not for long-term use.</li>
+    </ol>
+  </details>
+
+  <div class="row">
+    <div class="field">
+      <label class="inline"><input type="checkbox" id="useSym" checked> Add a symbol</label>
+    </div>
+    <div class="field">
+      <label for="syms">Symbols to pick from (UK QWERTY)</label>
+      <input id="syms" type="text" style="width:260px;font-family:var(--mono);letter-spacing:.08em">
+    </div>
+    <button id="safeSet">Safe set</button>
+    <button id="fullSet">Full UK set</button>
+  </div>
+  <div class="meta" id="symInfo" style="margin-bottom:1rem"></div>
+
+  <div class="card">
+    <div class="k">Suggested random password</div>
+    <div class="v"><span class="pw" id="pw">-</span></div>
+    <div class="row" style="margin-top:10px">
+      <button id="newBtn" class="primary">New password</button>
+      <button id="copyBtn">Copy</button>
+    </div>
+  </div>
+
+  <h2>Batch</h2>
+  <div class="row">
+    <div class="field">
+      <label for="n">How many</label>
+      <input id="n" type="number" min="1" max="500" value="10" style="width:100px">
+    </div>
+    <button id="batchBtn" class="primary">Generate</button>
+    <button id="copyAll">Copy all</button>
+  </div>
+  <div class="err" id="nErr"></div>
+  <table id="list" hidden>
+    <thead><tr><th>#</th><th>Password</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <details>
+    <summary>How it works</summary>
+    <p>Picks one colour (25 options), one animal (48 options), a number from 1 to 1000 and, if on, one symbol from the list, using the browser's secure random generator (<code>crypto.getRandomValues</code>). Nothing is sent anywhere.</p>
+    <p>The safe set skips keys that often break things or confuse users: <code>£ ¬</code> (not plain ASCII), quotes, backslash, backtick, <code>| &lt; &gt;</code>. The full set is every symbol on a UK keyboard.</p>
+    <p>Without a symbol that's about 1.2 million combinations; the safe set multiplies it by 15. Fine for a first-login password the user must change; too weak for anything long-lived.</p>
+  </details>
+</main>
+
+<script>
+(function () {
+  var ANIMALS = [
+    'Lion','Tiger','Elephant','Giraffe','Zebra','Rhinoceros',
+    'Hippopotamus','Kangaroo','Koala','Penguin','Flamingo',
+    'Ostrich','Alligator','Crocodile','Cheetah','Leopard',
+    'Panther','Jaguar','Gorilla','Orangutan','Chimpanzee',
+    'Lemur','Meerkat','Armadillo','Anteater','Sloth',
+    'Platypus','Echidna','Wombat','Tasmaniantiger','Ibex',
+    'Caribou','Reindeer','Muskox','Walrus','Manatee',
+    'Narwhal','Dolphin','Porpoise','Sealion','Stingray',
+    'Swordfish','Marlin','Octopus','Cuttlefish','Nautilus',
+    'Scorpion','Tarantula','Mantis'
+  ];
+  var COLOURS = [
+    'Red','Blue','Green','Black','White','Pink','Brown',
+    'Gray','Cyan','Teal','Olive','Navy','Beige','Coral',
+    'Ivory','Lime','Mint','Peach','Plum','Gold','Amber',
+    'Azure','Khaki','Cream','Aqua'
+  ];
+
+  // UK QWERTY symbols
+  var SAFE = "!$%^&*()-_=+#@?";
+  var FULL = "!\"£$%^&*()-_=+[]{};:'@#~,./<>?\\|`¬";
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function symList() {
+    var seen = {}, out = [];
+    Array.from($("syms").value).forEach(function (c) { if (c.trim() && !seen[c]) { seen[c] = 1; out.push(c); } });
+    return out;
+  }
+  function symInfo() {
+    var n = symList().length, on = $("useSym").checked;
+    $("syms").disabled = !on;
+    $("symInfo").textContent = on ? (n ? n + " symbols in the list" : "List is empty, so no symbol will be added") : "No symbol";
+  }
+
+  // Unbiased secure random int in [0, n)
+  function rand(n) {
+    var buf = new Uint32Array(1), limit = Math.floor(0x100000000 / n) * n;
+    do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+    return buf[0] % n;
+  }
+  function pick(a) { return a[rand(a.length)]; }
+  function make() {
+    var s = symList(), sym = $("useSym").checked && s.length ? pick(s) : "";
+    return pick(COLOURS) + pick(ANIMALS) + (rand(1000) + 1) + sym;
+  }
+
+  function copy(text, btn) {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(function () {
+      var old = btn.textContent; btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = old; }, 1200);
+    });
+  }
+
+  function single() { $("pw").textContent = make(); }
+
+  var last = [];
+  function batch() {
+    var n = parseInt($("n").value, 10), err = $("nErr");
+    if (!(n >= 1 && n <= 500)) { err.textContent = "Enter a number from 1 to 500"; return; }
+    err.textContent = "";
+    var tb = $("list").querySelector("tbody"); tb.innerHTML = ""; last = [];
+    for (var i = 0; i < n; i++) {
+      var p = make(); last.push(p);
+      var tr = document.createElement("tr");
+      var a = document.createElement("td"); a.textContent = i + 1;
+      var b = document.createElement("td"); b.textContent = p;
+      tr.appendChild(a); tr.appendChild(b); tb.appendChild(tr);
+    }
+    $("list").hidden = false;
+  }
+
+  $("syms").value = SAFE;
+  $("useSym").addEventListener("change", function () { symInfo(); single(); });
+  $("syms").addEventListener("input", symInfo);
+  $("safeSet").addEventListener("click", function () { $("syms").value = SAFE; symInfo(); single(); });
+  $("fullSet").addEventListener("click", function () { $("syms").value = FULL; symInfo(); single(); });
+  symInfo();
+  $("newBtn").addEventListener("click", single);
+  $("copyBtn").addEventListener("click", function () { copy($("pw").textContent, this); });
+  $("batchBtn").addEventListener("click", batch);
+  $("copyAll").addEventListener("click", function () { if (last.length) copy(last.join("\n"), this); });
+  single();
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>

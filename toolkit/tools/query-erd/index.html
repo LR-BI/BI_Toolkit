@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Query ERD · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  main { max-width: 1280px; }
+  #sql { min-height: 220px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; align-items: flex-end; }
+  .canvas { border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; margin-top: 10px; background: var(--bg); }
+  .canvas svg { display: block; }
+  .canvas .node { cursor: pointer; }
+  .canvas .node:hover rect.box { stroke: var(--accent-2); }
+  .canvas .node.sel rect.box { stroke: var(--accent); stroke-width: 2.5; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .legend span::before { content: ""; display: inline-block; width: 26px; height: 0; border-top: 2px solid var(--accent); vertical-align: middle; margin-right: 6px; }
+  .legend .l-left::before { border-top-style: dashed; border-color: var(--accent-2); }
+  .legend .l-where::before { border-top-style: dotted; border-color: var(--muted); }
+  .legend .l-apply::before { border-top: 2px dashed #c08a1f; }
+  td.code { font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+  .jt { font-size: 11px; font-weight: 700; border-radius: 3px; padding: 1px 6px; background: var(--tint); color: var(--tint-text); white-space: nowrap; }
+  .schema-note { font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { min-height: 0; padding: 3px 10px; font-size: 13px; font-family: var(--mono); }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .chips button.used { border-color: var(--accent-2); box-shadow: 0 0 0 2px var(--tint); }
+  #trace { margin-top: 10px; }
+  .tr { border-left: 2px solid var(--accent-2); padding: 2px 0 2px 12px; margin: 4px 0 4px 6px; font-size: 14px; }
+  .tr .ex { font-family: var(--mono); font-size: 12.5px; color: var(--muted); word-break: break-word; }
+  .tr .src { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .tr .via { font-size: 12px; color: var(--muted); }
+  .tr a { cursor: pointer; }
+  .canvas .rowbg { fill: transparent; }
+  .canvas .rowbg.hl { fill: var(--tint); }
+  .canvas .node.hl rect.box { stroke: var(--accent); stroke-width: 2.5; }
+  .canvas .rowhit { cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Query ERD</h1>
+  <p class="lead">Paste a query and see how its tables join: a diagram of every table and alias, the join type and the columns each join uses, plus warnings for accidental cross joins, disconnected tables, LEFT JOINs undone by WHERE, and (with your Schema Map loaded) joins that can multiply rows.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li>Paste a query. The diagram updates as you type.</li>
+      <li>Wide diagrams shrink to fit the page; untick <strong>Fit to width</strong> to see them full size and drag to move around.</li>
+      <li>Each box is a table (or CTE, derived table or APPLY) with its alias, the join columns in bold and the other columns the query uses. Lines show joins: solid for INNER, dashed for LEFT/RIGHT/FULL, dotted for joins written in WHERE, orange for APPLY.</li>
+      <li>Queries with CTEs or subqueries have several parts: pick one under <strong>Part of query</strong>. Click a CTE box to jump to it.</li>
+      <li><strong>Download SVG / PDF / PNG</strong> saves the diagram you can see (the part of the query picked in the list). Exports always use light colours so they print well.</li>
+      <li><strong>Trace a column</strong>: click any output column to follow it back through CTEs and subqueries to the table it really comes from (the path lights up in the diagram). Click a column inside a box to see which outputs use it.</li>
+      <li><strong>What to look at</strong> lists problems; the <strong>Joins</strong> table lists every join in order with its full ON condition.</li>
+      <li>If you've loaded a database in the <strong>Schema Map</strong> tool, its primary keys are used here to flag joins that don't use the whole key and so can return several rows per row.</li>
+      <li><strong>Copy Mermaid</strong> gives you the diagram as text for docs or GitHub.</li>
+    </ol>
+    <p>Try <strong>Load sample</strong> first. Nothing is sent anywhere.</p>
+  </details>
+
+  <textarea id="sql" spellcheck="false" placeholder="SELECT … FROM PEOPLE p JOIN PEOPLE_UNITS pu ON pu.PERSON_CODE = p.PERSON_CODE …"></textarea>
+  <div class="opts">
+    <div class="field"><label for="scope">Part of query</label><select id="scope"></select></div>
+    <label class="inline"><input type="checkbox" id="allCols" checked> Show non-join columns</label>
+    <label class="inline"><input type="checkbox" id="fit" checked> Fit to width</label>
+    <button id="sample">Load sample</button>
+    <button id="mermaid">Copy Mermaid</button>
+    <button id="expSvg">Download SVG</button>
+    <button id="expPdf">Download PDF</button>
+    <button id="expPng">PNG</button>
+    <button id="toChecker">Open in SQL Checker</button>
+  </div>
+  <div class="meta schema-note" id="schemaNote"></div>
+  <div class="err" id="err"></div>
+
+  <section id="res" hidden>
+    <div class="cards" id="cards"></div>
+    <div class="legend"><span>INNER JOIN</span><span class="l-left">LEFT / RIGHT / FULL</span><span class="l-where">Joined in WHERE</span><span class="l-apply">APPLY</span></div>
+    <div class="canvas pan" id="canvas"></div>
+    <div id="traceWrap" hidden>
+      <h2>Trace a column</h2>
+      <p class="meta" style="margin-top:0">Click an output column to see where it comes from; the tables and columns it uses light up in the diagram. Or click a column inside a box to see which outputs use it.</p>
+      <div class="chips" id="outs"></div>
+      <div id="trace"></div>
+    </div>
+    <h2>What to look at</h2>
+    <div id="finds"></div>
+    <h2>Joins</h2>
+    <div class="tablewrap pan" style="overflow-x:auto"><table id="joins"><thead><tr><th>#</th><th>Join</th><th>Table</th><th>Alias</th><th>On</th><th>Notes</th></tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var STATE = { scopes: [], cur: 0, src: "" };
+
+  // ---------- tokenizer (same rules as the SQL Checker) ----------
+  function tokenize(s) {
+    var T = [], i = 0, n = s.length;
+    function push(t, v, st) { T.push({ t: t, v: v, u: v.toUpperCase(), s: st, e: i }); }
+    while (i < n) {
+      var c = s[i], st = i;
+      if (/\s/.test(c)) { i++; continue; }
+      if (c === "-" && s[i + 1] === "-") { while (i < n && s[i] !== "\n") i++; continue; }
+      if (c === "/" && s[i + 1] === "*") { var d = 1; i += 2; while (i < n && d > 0) { if (s[i] === "/" && s[i + 1] === "*") { d++; i += 2; } else if (s[i] === "*" && s[i + 1] === "/") { d--; i += 2; } else i++; } continue; }
+      if (c === "'" || ((c === "N" || c === "n") && s[i + 1] === "'")) { if (c !== "'") i++; i++; var v = ""; while (i < n) { if (s[i] === "'") { if (s[i + 1] === "'") { v += "'"; i += 2; continue; } i++; break; } v += s[i++]; } push("str", v, st); continue; }
+      if (c === "[") { i++; var b = ""; while (i < n) { if (s[i] === "]") { if (s[i + 1] === "]") { b += "]"; i += 2; continue; } i++; break; } b += s[i++]; } push("id", b, st); continue; }
+      if (c === '"') { i++; var q = ""; while (i < n && s[i] !== '"') q += s[i++]; i++; push("id", q, st); continue; }
+      if (/[0-9]/.test(c)) { while (i < n && /[0-9.]/.test(s[i])) i++; push("num", s.slice(st, i), st); continue; }
+      if (/[A-Za-z_@#À-￿]/.test(c)) { while (i < n && /[\w@#$À-￿]/.test(s[i])) i++; var w = s.slice(st, i); push(w[0] === "@" ? "var" : "word", w, st); continue; }
+      var two = s.substr(i, 2);
+      if (["<=", ">=", "<>", "!=", "!<", "!>"].indexOf(two) >= 0) { i += 2; push("op", two, st); continue; }
+      i++; push("op", c, st);
+    }
+    return T;
+  }
+  function matchParens(T) { var M = {}, st = []; T.forEach(function (t, i) { if (t.t !== "op") return; if (t.v === "(") st.push(i); else if (t.v === ")" && st.length) { var o = st.pop(); M[o] = i; M[i] = o; } }); return M; }
+
+  var KW = {};
+  ("SELECT FROM WHERE GROUP ORDER BY HAVING UNION ALL EXCEPT INTERSECT JOIN INNER LEFT RIGHT FULL OUTER CROSS APPLY ON AND OR NOT AS WITH INTO VALUES SET " +
+   "UPDATE DELETE INSERT MERGE TOP DISTINCT CASE WHEN THEN ELSE END IS NULL IN EXISTS BETWEEN LIKE OPTION OVER PARTITION PIVOT UNPIVOT FOR " +
+   "DECLARE IF BEGIN RETURN EXEC EXECUTE USING OUTPUT WINDOW TABLESAMPLE").split(" ").forEach(function (w) { KW[w] = 1; });
+  var DP = {}; "YEAR YY YYYY QUARTER QQ MONTH MM DAYOFYEAR DY DAY DD WEEK WK WW WEEKDAY DW HOUR HH MINUTE MI SECOND SS MILLISECOND MS".split(" ").forEach(function (w) { DP[w] = 1; });
+  var TY = {}; "INT BIGINT SMALLINT TINYINT BIT DECIMAL NUMERIC FLOAT REAL MONEY DATE DATETIME DATETIME2 SMALLDATETIME TIME VARCHAR NVARCHAR CHAR NCHAR TEXT NTEXT MAX UNIQUEIDENTIFIER".split(" ").forEach(function (w) { TY[w] = 1; });
+  var END_FROM = { WHERE: 1, GROUP: 1, ORDER: 1, HAVING: 1, UNION: 1, EXCEPT: 1, INTERSECT: 1, OPTION: 1, FOR: 1, WINDOW: 1 };
+
+  // ---------- parse ----------
+  function parse(src) {
+    var T = tokenize(src), M = matchParens(T), scopes = [];
+    function W(i) { return T[i] && (T[i].t === "word" || T[i].t === "id") ? T[i].u : ""; }
+    function V(i) { return T[i] && T[i].t === "op" ? T[i].v : ""; }
+    function isName(i) { return T[i] && (T[i].t === "id" || (T[i].t === "word" && !KW[T[i].u])); }
+
+    // CTEs
+    var ctes = {}, i0 = 0;
+    if (W(0) === "WITH") {
+      var k = 1;
+      while (isName(k)) {
+        var name = T[k].v; k++;
+        if (V(k) === "(" && M[k] !== undefined) k = M[k] + 1;
+        if (W(k) !== "AS" || V(k + 1) !== "(" || M[k + 1] === undefined) break;
+        var o = k + 1, c = M[o];
+        ctes[name.toUpperCase()] = { name: name, a: o + 1, b: c - 1 };
+        k = c + 1;
+        if (V(k) === ",") { k++; continue; }
+        break;
+      }
+      i0 = k;
+    }
+    // Root statements: split at top-level SELECT starts (UNION parts) and ;
+    var rootParts = [], start = i0, depth = 0, partNo = 0;
+    for (var i = i0; i <= T.length; i++) {
+      var atEnd = i === T.length;
+      if (!atEnd && V(i) === "(" && M[i] !== undefined) { i = M[i]; continue; }
+      if (atEnd || V(i) === ";" || (W(i) === "SELECT" && i > start && !/^(UNION|ALL|EXCEPT|INTERSECT|INTO)$/.test(W(i - 1)) && false)) {
+        if (i - 1 >= start) rootParts.push([start, atEnd ? i - 1 : i - 1]);
+        start = i + 1;
+      }
+    }
+    rootParts.forEach(function (r, n) { scopes.push(scope(r[0], r[1], rootParts.length > 1 ? "Statement " + (n + 1) : "Main query", "main")); });
+    Object.keys(ctes).forEach(function (k) { var c = ctes[k]; scopes.push(scope(c.a, c.b, "CTE " + c.name, "cte")); });
+    // Nested subqueries
+    var seen = {};
+    for (i = 0; i < T.length; i++) {
+      if (V(i) === "(" && M[i] !== undefined && W(i + 1) === "SELECT") {
+        var isCte = Object.keys(ctes).some(function (k) { return ctes[k].a === i + 1; });
+        if (isCte || seen[i]) continue;
+        seen[i] = 1;
+        var prev = W(i - 1), after = M[i] + 1, alias = W(after) === "AS" ? T[after + 1] && T[after + 1].v : (isName(after) ? T[after].v : "");
+        var label = /^(FROM|JOIN|APPLY)$/.test(prev) || V(i - 1) === "," ? (prev === "APPLY" ? "APPLY " : "Derived table ") + (alias || "")
+          : /^(EXISTS|IN)$/.test(prev) ? prev + " subquery" : "Subquery";
+        scopes.push(scope(i + 1, M[i] - 1, label.trim(), "sub"));
+      }
+    }
+    return { T: T, scopes: scopes.filter(function (s) { return s.nodes.length; }), ctes: ctes };
+
+    function scope(a, b, label, kind) {
+      var sc = { label: label, kind: kind, a: a, b: b, nodes: [], edges: [], joins: [], whereTok: [], flags: [], nameToks: {} };
+      var byAlias = {};
+      // walk own-level tokens to find FROM
+      for (var i = a; i <= b; i++) {
+        if (V(i) === "(" && M[i] !== undefined) { i = M[i]; continue; }
+        if (W(i) === "FROM") { i = fromClause(i + 1); continue; }
+        if (W(i) === "WHERE") { var e = clauseEnd(i + 1); sc.whereTok = [i + 1, e]; i = e; continue; }
+        if (/^(UPDATE|DELETE)$/.test(W(i)) && isName(i + 1) && !sc.target) sc.target = i + 1;
+      }
+      if (!sc.nodes.length && sc.target !== undefined) { var tn = addNode(sc.target, null, "table", "FROM"); sc.joins.push({ n: 1, type: "FROM", node: tn, on: null, onTxt: "" }); }
+      function clauseEnd(k) {
+        for (; k <= b; k++) {
+          if (V(k) === "(" && M[k] !== undefined) { k = M[k]; continue; }
+          if (END_FROM[W(k)] || V(k) === ";") return k - 1;
+        }
+        return b;
+      }
+      function readItem(k) {
+        var it = { start: k, kind: "table", name: "", alias: "" };
+        if (V(k) === "(" && M[k] !== undefined) {
+          it.kind = W(k + 1) === "SELECT" ? "derived" : W(k + 1) === "VALUES" ? "values" : "derived";
+          it.name = "(subquery)"; it.inner = [k + 1, M[k] - 1]; k = M[k] + 1;
+        } else if (isName(k) || T[k] && T[k].t === "var") {
+          var parts = [];
+          while (true) {
+            if (isName(k) || (T[k] && T[k].t === "var")) { parts.push(T[k].v); sc.nameToks[k] = 1; k++; }
+            if (V(k) === ".") { sc.nameToks[k] = 1; k++; if (V(k) === ".") { sc.nameToks[k] = 1; k++; parts.push(""); } continue; }
+            break;
+          }
+          it.name = parts.filter(Boolean).join(".");
+          it.short = parts.filter(Boolean).pop() || "";
+          if (V(k) === "(" && M[k] !== undefined) { it.kind = "function"; k = M[k] + 1; }
+          if (ctes[(it.short || "").toUpperCase()] && parts.filter(Boolean).length === 1) it.kind = "cte";
+          if (T[k - 1] && /^#/.test(it.short)) it.kind = "temp";
+        } else return null;
+        if (W(k) === "AS") k++;
+        if (isName(k) && !/^(INNER|LEFT|RIGHT|FULL|CROSS|OUTER|JOIN|ON|WITH|WHERE|APPLY)$/.test(W(k))) { it.alias = T[k].v; sc.nameToks[k] = 1; k++; }
+        if (W(k) === "WITH" && V(k + 1) === "(" && M[k + 1] !== undefined) { it.hints = T.slice(k + 2, M[k + 1]).map(function (t) { return t.v; }).join(" "); k = M[k + 1] + 1; }
+        it.end = k;
+        return it;
+      }
+      function addNode(k, it, kind, how) {
+        if (!it) it = { name: T[k].v, short: T[k].v, kind: kind, alias: "" };
+        var al = (it.alias || it.short || it.name || "?");
+        var key = al.toUpperCase(), n = 2; while (byAlias[key]) key = al.toUpperCase() + "_" + n++;
+        var node = { key: key, alias: al, name: it.name, short: it.short || it.name, kind: it.kind, inner: it.inner, hints: it.hints, cols: {}, joinCols: {}, filters: 0, joinType: how, order: sc.nodes.length };
+        byAlias[key] = node; sc.nodes.push(node); return node;
+      }
+      function fromClause(k) {
+        var end = clauseEnd(k), first = true, type = "FROM";
+        while (k <= end) {
+          var it = readItem(k); if (!it) break;
+          var node = addNode(k, it, null, type);
+          var j = { n: sc.joins.length + 1, type: type, node: node, on: null, onTxt: "" };
+          k = it.end;
+          if (W(k) === "ON") {
+            var s = k + 1, e = s;
+            for (; e <= end; e++) {
+              if (V(e) === "(" && M[e] !== undefined) { e = M[e]; continue; }
+              if (V(e) === "," || /^(INNER|LEFT|RIGHT|FULL|CROSS|OUTER|JOIN)$/.test(W(e)) && isJoinStart(e)) break;
+            }
+            j.on = [s, e - 1]; j.onTxt = src.slice(T[s].s, T[e - 1].e);
+            k = e;
+          }
+          sc.joins.push(j);
+          if (k > end) break;
+          if (V(k) === ",") { type = "comma"; k++; continue; }
+          var jt = joinType(k); if (!jt) break;
+          type = jt.type; k = jt.next;
+        }
+        return end;
+      }
+      function isJoinStart(e) { return !!joinType(e); }
+      function joinType(k) {
+        var w = W(k), w2 = W(k + 1), w3 = W(k + 2);
+        if (w === "JOIN") return { type: "INNER", next: k + 1 };
+        if (w === "INNER" && w2 === "JOIN") return { type: "INNER", next: k + 2 };
+        if (/^(LEFT|RIGHT|FULL)$/.test(w)) { if (w2 === "JOIN") return { type: w, next: k + 2 }; if (w2 === "OUTER" && w3 === "JOIN") return { type: w, next: k + 3 }; }
+        if (w === "CROSS" && w2 === "JOIN") return { type: "CROSS", next: k + 2 };
+        if ((w === "CROSS" || w === "OUTER") && w2 === "APPLY") return { type: w + " APPLY", next: k + 2 };
+        if (/^(LOOP|HASH|MERGE)$/.test(w) && w2 === "JOIN") return { type: "INNER", next: k + 2 };
+        return null;
+      }
+
+      // Qualified column refs anywhere inside the scope (incl. nested, for correlation)
+      function refsIn(r, onlyOwn) {
+        var out = [];
+        for (var i = r[0]; i <= r[1]; i++) {
+          if (onlyOwn && V(i) === "(" && M[i] !== undefined && W(i + 1) === "SELECT") { i = M[i]; continue; }
+          if (sc.nameToks[i]) continue;
+          if ((T[i].t === "word" || T[i].t === "id") && V(i + 1) === "." && T[i + 2] && (T[i + 2].t === "word" || T[i + 2].t === "id" || V(i + 2) === "*")) {
+            if (V(i - 1) === ".") continue; // part of db.schema.table.col
+            var q = T[i].u; if (byAlias[q]) out.push({ al: q, col: T[i + 2].v, i: i });
+            i += 2;
+          }
+        }
+        return out;
+      }
+      refsIn([a, b], false).forEach(function (r) { if (r.col !== "*") byAlias[r.al].cols[r.col.toUpperCase()] = r.col; });
+
+      // Predicates: split by AND/OR at depth 0 (BETWEEN-aware)
+      function predicates(r) {
+        var out = [], cur = r[0], btw = 0;
+        for (var i = r[0]; i <= r[1] + 1; i++) {
+          if (i <= r[1] && V(i) === "(" && M[i] !== undefined) { i = M[i]; continue; }
+          if (i <= r[1] && W(i) === "BETWEEN") btw++;
+          if (i > r[1] || ((W(i) === "AND" || W(i) === "OR") && !(W(i) === "AND" && btw && btw--))) {
+            if (i - 1 >= cur) out.push([cur, i - 1]);
+            cur = i + 1;
+          }
+        }
+        return out;
+      }
+      function predInfo(p) {
+        var rs = refsIn(p, true), als = {};
+        rs.forEach(function (r) { (als[r.al] = als[r.al] || []).push(r.col); });
+        var txt = src.slice(T[p[0]].s, T[p[1]].e).trim();
+        return { als: als, keys: Object.keys(als), txt: txt, eq: T.slice(p[0], p[1] + 1).some(function (t) { return t.t === "op" && t.v === "="; }), isNull: /\bIS\s+NULL\b/i.test(txt) && !/\bIS\s+NOT\s+NULL\b/i.test(txt) };
+      }
+
+      var leftJoined = {};
+      sc.joins.forEach(function (j, idx) {
+        var me = j.node.key;
+        j.notes = [];
+        if (/^(LEFT|RIGHT|FULL)$/.test(j.type)) leftJoined[me] = j.type;
+        if (j.on) {
+          var ps = predicates(j.on).map(predInfo), touchesMe = false, others = {};
+          ps.forEach(function (p) {
+            if (p.keys.indexOf(me) >= 0) touchesMe = true;
+            if (p.keys.length >= 2 && p.keys.indexOf(me) >= 0) p.keys.forEach(function (o) {
+              if (o === me) return;
+              (others[o] = others[o] || []).push([p.als[me][0], p.als[o][0], p.eq]);
+            });
+            else if (p.keys.length === 1) j.node.filters++;
+          });
+          Object.keys(others).forEach(function (o) {
+            sc.edges.push({ a: o, b: me, type: j.type, pairs: others[o], txt: j.onTxt });
+            others[o].forEach(function (pr) { j.node.joinCols[pr[0].toUpperCase()] = pr[0]; byAlias[o].joinCols[pr[1].toUpperCase()] = pr[1]; });
+            if (others[o].every(function (pr) { return !pr[2]; })) j.notes.push({ sev: "info", t: "Join to " + byAlias[o].alias + " uses no = (range or other comparison)." });
+          });
+          if (!touchesMe) j.notes.push({ sev: "error", t: "ON doesn't mention " + j.node.alias + ", so every row of it matches (a hidden cross join)." });
+          else if (!Object.keys(others).length) j.notes.push({ sev: "error", t: "ON only filters " + j.node.alias + "; it never links it to another table, so every row matches every row." });
+          // INNER JOIN on a LEFT-joined table
+          if (j.type === "INNER") Object.keys(others).forEach(function (o) { if (leftJoined[o] === "LEFT") j.notes.push({ sev: "warn", t: "INNER JOIN through " + byAlias[o].alias + ", which was LEFT joined; rows where " + byAlias[o].alias + " didn't match are dropped again. Make this a LEFT JOIN too, or nest it." }); });
+        }
+        if (j.type === "CROSS") j.notes.push({ sev: "info", t: "CROSS JOIN: every row is paired with every row. Fine if intended (e.g. a one-row parameter table)." });
+        if (j.type === "RIGHT") j.notes.push({ sev: "info", t: "RIGHT JOIN: usually clearer rewritten as a LEFT JOIN with the tables swapped." });
+        if (/APPLY/.test(j.type) && j.node.inner) {
+          var inner = refsInOuter(j.node.inner), corr = {};
+          inner.forEach(function (r) { (corr[r.al] = corr[r.al] || []).push(r.col); });
+          Object.keys(corr).forEach(function (o) {
+            sc.edges.push({ a: o, b: me, type: j.type, pairs: corr[o].map(function (c) { return ["(inside)", c, true]; }), txt: "correlated on " + corr[o].map(function (c) { return byAlias[o].alias + "." + c; }).join(", ") });
+            corr[o].forEach(function (c) { byAlias[o].joinCols[c.toUpperCase()] = c; });
+          });
+          if (!Object.keys(corr).length) j.notes.push({ sev: "warn", t: "The APPLY doesn't refer to any outer table, so it returns the same rows for every row." });
+          j.onTxt = Object.keys(corr).length ? "correlated on " + Object.keys(corr).map(function (o) { return corr[o].map(function (c) { return byAlias[o].alias + "." + c; }).join(", "); }).join(", ") : "";
+        }
+      });
+      function refsInOuter(r) { // refs inside an APPLY body to aliases of this scope
+        var out = [];
+        for (var i = r[0]; i <= r[1]; i++) if ((T[i].t === "word" || T[i].t === "id") && V(i + 1) === "." && T[i + 2] && V(i - 1) !== "." && byAlias[T[i].u] && byAlias[T[i].u].inner !== r) out.push({ al: T[i].u, col: T[i + 2].v });
+        return out.filter(function (x, i, arr) { return arr.findIndex(function (y) { return y.al === x.al && y.col === x.col; }) === i; });
+      }
+      // WHERE: implicit joins + filters + LEFT JOIN undone
+      if (sc.whereTok.length) {
+        predicates(sc.whereTok).map(predInfo).forEach(function (p) {
+          if (p.keys.length === 2) {
+            var x = p.keys[0], y = p.keys[1];
+            var exists = sc.edges.some(function (e) { return (e.a === x && e.b === y) || (e.a === y && e.b === x); });
+            if (!exists) sc.edges.push({ a: byAlias[x].order < byAlias[y].order ? x : y, b: byAlias[x].order < byAlias[y].order ? y : x, type: "WHERE", pairs: [[p.als[byAlias[x].order < byAlias[y].order ? y : x][0], p.als[byAlias[x].order < byAlias[y].order ? x : y][0], p.eq]], txt: p.txt });
+            byAlias[x].joinCols[p.als[x][0].toUpperCase()] = p.als[x][0]; byAlias[y].joinCols[p.als[y][0].toUpperCase()] = p.als[y][0];
+          } else if (p.keys.length === 1) {
+            var al = p.keys[0]; byAlias[al].filters++;
+            if (leftJoined[al] === "LEFT" && !p.isNull) sc.flags.push({ sev: "warn", t: byAlias[al].alias + " is LEFT JOINed but filtered in WHERE (" + clip(p.txt, 70) + "), which drops the unmatched rows and makes it an inner join. Move the filter into the ON clause." });
+          }
+        });
+      }
+      // Disconnected tables / cartesian
+      if (sc.nodes.length > 1) {
+        var adj = {}; sc.nodes.forEach(function (n) { adj[n.key] = []; });
+        sc.edges.forEach(function (e) { if (adj[e.a] && adj[e.b]) { adj[e.a].push(e.b); adj[e.b].push(e.a); } });
+        var comp = {}, c = 0, how = {}; sc.joins.forEach(function (j) { how[j.node.key] = j.type; });
+        sc.nodes.forEach(function (n) { if (comp[n.key] !== undefined) return; c++; (function walk(k) { if (comp[k] !== undefined) return; comp[k] = c; adj[k].forEach(walk); })(n.key); });
+        sc.components = c; sc.comp = comp; sc.how = how;
+        if (c > 1) {
+          var lonelyN = sc.nodes.filter(function (n) { return comp[n.key] !== comp[sc.nodes[0].key] && how[n.key] !== "CROSS"; });
+          var onOnly = {}; sc.joins.forEach(function (j) { if (j.notes.some(function (x) { return x.sev === "error"; })) onOnly[j.node.key] = 1; });
+          lonelyN = lonelyN.filter(function (n) { return !onOnly[n.key]; });
+          if (lonelyN.length) sc.flags.push({ sev: lonelyN.every(function (n) { return /APPLY/.test(how[n.key] || ""); }) ? "info" : "error", t: "Not linked to the rest of the query: " + lonelyN.map(function (n) { return n.alias; }).join(", ") + ". Every row will be paired with every row of the others (a cartesian product) unless that's intended." });
+        }
+        // Same table twice
+        var names = {}; sc.nodes.forEach(function (n) { if (n.kind === "table") { var k = n.short.toUpperCase(); (names[k] = names[k] || []).push(n.alias); } });
+        Object.keys(names).forEach(function (k) { if (names[k].length > 1) sc.flags.push({ sev: "info", t: k + " is joined " + names[k].length + " times (" + names[k].join(", ") + "). Fine for self-joins or lookups to the same table; check each copy has its own conditions." }); });
+      }
+      // ---- Output columns (SELECT list) for tracing ----
+      sc.outputs = [];
+      (function () {
+        var sel = -1;
+        for (var i = a; i <= b; i++) { if (V(i) === "(" && M[i] !== undefined) { i = M[i]; continue; } if (W(i) === "SELECT") { sel = i; break; } }
+        if (sel < 0) return;
+        var k = sel + 1;
+        if (W(k) === "DISTINCT" || W(k) === "ALL") k++;
+        if (W(k) === "TOP") { k++; if (V(k) === "(" && M[k] !== undefined) k = M[k] + 1; else k++; if (W(k) === "PERCENT") k++; if (W(k) === "WITH" && W(k + 1) === "TIES") k += 2; }
+        var end = b;
+        for (var j = k; j <= b; j++) { if (V(j) === "(" && M[j] !== undefined) { j = M[j]; continue; } if (W(j) === "FROM" || W(j) === "INTO" || V(j) === ";" || END_FROM[W(j)]) { end = j - 1; break; } }
+        var items = [], st = k;
+        for (j = k; j <= end + 1; j++) {
+          if (j <= end && V(j) === "(" && M[j] !== undefined) { j = M[j]; continue; }
+          if (j > end || V(j) === ",") { if (j - 1 >= st) items.push([st, j - 1]); st = j + 1; }
+        }
+        var single = sc.nodes.length === 1 ? sc.nodes[0] : null;
+        items.forEach(function (r) {
+          var s0 = r[0], e0 = r[1], name = "", es = s0, ee = e0, star = null;
+          if (isName(s0) && V(s0 + 1) === "=" && e0 > s0 + 1) { name = T[s0].v; es = s0 + 2; }
+          else if (W(e0 - 1) === "AS" && e0 - 1 > s0) { name = T[e0].v; ee = e0 - 2; }
+          else if (e0 > s0 && isName(e0) && V(e0 - 1) !== "." && (V(e0 - 1) === ")" || W(e0 - 1) === "END" || isName(e0 - 1) || (T[e0 - 1] && /^(num|str)$/.test(T[e0 - 1].t)))) { name = T[e0].v; ee = e0 - 1; }
+          if (V(ee) === "*") { star = ee > es && V(ee - 1) === "." ? T[ee - 2].u : "ALL"; name = name || (star === "ALL" ? "*" : T[ee - 2].v + ".*"); }
+          if (!name) name = T[ee] && (T[ee].t === "word" || T[ee].t === "id") ? T[ee].v : "(expression " + (sc.outputs.length + 1) + ")";
+          var refs = refsIn([es, ee], false).filter(function (x) { return x.col !== "*"; }).map(function (x) { return { key: x.al, col: x.col }; });
+          var unq = [];
+          for (var t = es; t <= ee; t++) {
+            if (V(t) === "(" && M[t] !== undefined && W(t + 1) === "SELECT") { t = M[t]; continue; }
+            var tk = T[t]; if (!tk || !(tk.t === "word" || tk.t === "id")) continue;
+            if (tk.t === "word" && (KW[tk.u] || DP[tk.u] || TY[tk.u])) continue;
+            if (V(t + 1) === "(" || V(t + 1) === "." || V(t - 1) === "." || W(t - 1) === "AS") continue;
+            unq.push(tk.v);
+          }
+          if (single) { unq.forEach(function (c) { refs.push({ key: single.key, col: c }); single.cols[c.toUpperCase()] = c; }); unq = []; }
+          var seen = {}; refs = refs.filter(function (x) { var q = x.key + "." + x.col.toUpperCase(); if (seen[q]) return false; seen[q] = 1; return true; });
+          sc.outputs.push({ name: name, expr: src.slice(T[es].s, T[ee].e).replace(/\s+/g, " ").trim(), refs: refs, unq: unq, star: star });
+        });
+      })();
+      sc.byAlias = byAlias;
+      return sc;
+    }
+  }
+  function clip(s, n) { s = String(s || "").replace(/\s+/g, " "); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+  // ---------- Schema Map keys (optional) ----------
+  function schemaKeys() {
+    try {
+      var s = JSON.parse(localStorage.getItem("bitk.schemamap.v1") || "null"); if (!s || !s.text) return null;
+      var pk = {}, cols = {};
+      s.text.split(/\r?\n/).forEach(function (l) {
+        var c = l.split("\t").map(function (x) { return x.trim(); });
+        if (c[0] === "P") (pk[c[2].toUpperCase()] = pk[c[2].toUpperCase()] || []).push(c[3].toUpperCase());
+        if (c[0] === "C") cols[c[2].toUpperCase()] = 1;
+      });
+      return { pk: pk, tables: Object.keys(cols).length, db: s.db || "" };
+    } catch (e) { return null; }
+  }
+  function fanOut(sc) {
+    var K = schemaKeys(); $("schemaNote").textContent = K ? "Using primary keys from your Schema Map (" + K.tables + " tables" + (K.db ? ", " + K.db : "") + ") to check for joins that can multiply rows." : "Tip: load a database in the Schema Map tool and this page will also flag joins that can multiply rows.";
+    if (!K) return;
+    sc.joins.forEach(function (j) {
+      if (!j.node || j.node.kind !== "table" || /APPLY|CROSS|FROM|comma/.test(j.type)) return;
+      var pk = K.pk[j.node.short.toUpperCase()]; if (!pk || !pk.length) return;
+      var used = Object.keys(j.node.joinCols);
+      var missing = pk.filter(function (c) { return used.indexOf(c) < 0; });
+      if (missing.length) j.notes.push({ sev: "warn", t: j.node.short + "'s key is (" + pk.join(", ") + ") but this join doesn't use " + missing.join(", ") + ", so one row can match several " + j.node.alias + " rows and multiply the results." });
+    });
+  }
+
+  // ---------- render ----------
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function run() {
+    var src = $("sql").value; STATE.src = src; $("err").textContent = "";
+    if (!src.trim()) { $("res").hidden = true; $("scope").innerHTML = ""; return; }
+    var P;
+    try { P = parse(src); } catch (e) { $("err").textContent = "Couldn't read this query: " + e.message; return; }
+    var prevSel = STATE.sel; STATE.scopes = P.scopes;
+    if (prevSel && prevSel.type === "out" && prevSel.scope.outputs[prevSel.i]) STATE.sel = { type: "pending", scopeLabel: prevSel.scope.label, name: prevSel.scope.outputs[prevSel.i].name }; else STATE.sel = null;
+    var sel = $("scope"), keep = sel.value; sel.innerHTML = "";
+    P.scopes.forEach(function (s, i) { var o = el("option", "", s.label + " (" + s.nodes.length + " table" + (s.nodes.length === 1 ? "" : "s") + ")"); o.value = i; sel.appendChild(o); });
+    if (!P.scopes.length) { $("err").textContent = "No FROM clause found."; $("res").hidden = true; return; }
+    sel.value = keep && +keep < P.scopes.length ? keep : 0;
+    draw();
+  }
+  function draw() {
+    var sc = STATE.scopes[+$("scope").value]; if (!sc) return;
+    fanOut(sc);
+    $("res").hidden = false;
+    var c = $("cards"); c.innerHTML = "";
+    function card(k, v) { var d = el("div", "card"); d.appendChild(el("div", "k", k)); var x = el("div", "v", v); x.style.fontSize = "20px"; d.appendChild(x); c.appendChild(d); }
+    card("Tables", sc.nodes.length); card("Joins", sc.edges.length);
+    var types = {}; sc.joins.forEach(function (j) { if (j.type !== "FROM") types[j.type] = (types[j.type] || 0) + 1; });
+    card("Join types", Object.keys(types).map(function (k) { return types[k] + " " + (k === "comma" ? "comma" : k); }).join(", ") || "-");
+    card("Parts of query", STATE.scopes.length);
+    drawSvg(sc);
+    drawOutputs(sc);
+    // findings
+    var fd = $("finds"); fd.innerHTML = "";
+    var all = sc.flags.slice();
+    sc.joins.forEach(function (j) { j.notes.forEach(function (n) { all.push({ sev: n.sev, t: (j.type === "FROM" ? "" : "Join #" + j.n + " (" + j.node.alias + "): ") + n.t }); }); });
+    all.sort(function (a, b) { var o = { error: 0, warn: 1, info: 2 }; return o[a.sev] - o[b.sev]; });
+    if (!all.length) fd.appendChild(el("p", "meta", "No join problems found in this part of the query."));
+    all.forEach(function (f) { var d = el("div", "find is-" + f.sev); var hd = el("div", "hd"); hd.appendChild(el("span", "sev " + f.sev, f.sev === "info" ? "tip" : f.sev)); hd.appendChild(el("span", "m", f.t)); d.appendChild(hd); d.style.cursor = "default"; fd.appendChild(d); });
+    // joins table
+    var tb = $("joins").querySelector("tbody"); tb.innerHTML = "";
+    sc.joins.forEach(function (j) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "", String(j.n)));
+      var t2 = el("td"); t2.appendChild(el("span", "jt", j.type === "FROM" ? "FROM" : j.type === "comma" ? ", (comma)" : j.type)); tr.appendChild(t2);
+      tr.appendChild(el("td", "", j.node.name + (j.node.kind !== "table" ? " [" + j.node.kind + "]" : "") + (j.node.hints ? " WITH (" + j.node.hints + ")" : "")));
+      tr.appendChild(el("td", "", j.node.alias));
+      tr.appendChild(el("td", "code", j.onTxt || ""));
+      tr.appendChild(el("td", "", j.notes.map(function (n) { return n.t; }).join(" ")));
+      tb.appendChild(tr);
+    });
+  }
+
+  function drawSvg(sc) {
+    var host = $("canvas"); host.innerHTML = "";
+    var ns = "http://www.w3.org/2000/svg", showAll = $("allCols").checked;
+    var W = 230, GAPX = 110, GAPY = 26, HH = 42, RH = 18, MAXR = 14;
+    // layers by BFS over edges, in FROM order
+    var adj = {}; sc.nodes.forEach(function (n) { adj[n.key] = []; });
+    sc.edges.forEach(function (e) { if (adj[e.a] && adj[e.b]) { adj[e.a].push(e.b); adj[e.b].push(e.a); } });
+    var depth = {}, q = [], maxD = 0;
+    sc.nodes.forEach(function (n) {
+      if (depth[n.key] !== undefined) return;
+      var base = 0; // unlinked tables start a new chain at the left, below the others
+      depth[n.key] = base; q.push(n.key);
+      while (q.length) { var k = q.shift(); adj[k].forEach(function (o) { if (depth[o] === undefined) { depth[o] = depth[k] + 1; if (depth[o] > maxD) maxD = depth[o]; q.push(o); } }); }
+      if (base > maxD) maxD = base;
+    });
+    var cols = {}; sc.nodes.forEach(function (n) { (cols[depth[n.key]] = cols[depth[n.key]] || []).push(n); });
+    var pos = {}, H = 0;
+    Object.keys(cols).forEach(function (d) {
+      var y = 20;
+      cols[d].forEach(function (n) {
+        var jc = Object.keys(n.joinCols), oc = Object.keys(n.cols).filter(function (c) { return !n.joinCols[c]; });
+        var rows = jc.map(function (c) { return { c: n.joinCols[c], j: true }; }).concat(showAll ? oc.map(function (c) { return { c: n.cols[c], j: false }; }) : []);
+        var more = rows.length > MAXR ? rows.length - MAXR : 0; rows = rows.slice(0, MAXR);
+        var h = HH + rows.length * RH + (more ? RH : 0) + 8;
+        pos[n.key] = { x: 20 + (+d) * (W + GAPX), y: y, h: h, rows: rows, more: more };
+        y += h + GAPY;
+      });
+      if (y > H) H = y;
+    });
+    var Wt = 40 + (maxD + 1) * W + maxD * GAPX;
+    var svg = document.createElementNS(ns, "svg"), Ht = Math.max(H, 120);
+    svg.setAttribute("viewBox", "0 0 " + Wt + " " + Ht);
+    if ($("fit").checked) { svg.setAttribute("width", "100%"); svg.style.maxWidth = Wt + "px"; svg.style.height = "auto"; }
+    else { svg.setAttribute("width", Wt); svg.setAttribute("height", Ht); } svg.setAttribute("font-family", "var(--ui)"); svg.setAttribute("font-size", "12");
+    function mk(tag, at, txt) { var e = document.createElementNS(ns, tag); for (var k in at) e.setAttribute(k, at[k]); if (txt !== undefined) e.textContent = txt; return e; }
+    function rowY(key, col) {
+      var p = pos[key]; if (!col) return p.y + HH / 2;
+      for (var i = 0; i < p.rows.length; i++) if (p.rows[i].c.toUpperCase() === String(col).toUpperCase()) return p.y + HH + i * RH + RH / 2 + 2;
+      return p.y + HH / 2;
+    }
+    var edgeLayer = mk("g", {}), nodeLayer = mk("g", {}), labelLayer = mk("g", {});
+    svg.appendChild(edgeLayer); svg.appendChild(nodeLayer); svg.appendChild(labelLayer);
+    sc.edges.forEach(function (e) {
+      var A = pos[e.a], B = pos[e.b]; if (!A || !B) return;
+      var left = A.x <= B.x ? e.a : e.b, right = left === e.a ? e.b : e.a;
+      var pr = e.pairs[0] || [];
+      var colB = pr[0], colA = pr[1];
+      var lc = left === e.a ? colA : colB, rc = left === e.a ? colB : colA;
+      if (lc === "(inside)") lc = null; if (rc === "(inside)") rc = null;
+      var L = pos[left], R = pos[right], x1, y1 = rowY(left, lc), x2, y2 = rowY(right, rc), d;
+      if (L.x === R.x) { x1 = L.x + W; x2 = R.x + W; var bx = x1 + 50; d = "M" + x1 + "," + y1 + " C" + bx + "," + y1 + " " + bx + "," + y2 + " " + x2 + "," + y2; }
+      else { x1 = L.x + W; x2 = R.x; var mx = (x1 + x2) / 2; d = "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2; }
+      var style = { "INNER": ["var(--accent)", ""], "LEFT": ["var(--accent-2)", "6,4"], "RIGHT": ["var(--accent-2)", "6,4"], "FULL": ["var(--accent-2)", "6,4"], "WHERE": ["var(--muted)", "2,4"], "CROSS": ["var(--danger)", "2,3"] }[e.type] || ["#c08a1f", "7,4"];
+      edgeLayer.appendChild(mk("path", { d: d, fill: "none", stroke: style[0], "stroke-width": 2, "stroke-dasharray": style[1] }));
+      var lx = L.x === R.x ? x1 + 40 : (x1 + x2) / 2, ly = (y1 + y2) / 2;
+      var label = e.type === "WHERE" ? "WHERE" : e.type.replace(" APPLY", " APPLY");
+      var w = label.length * 6.4 + 12;
+      var g = mk("g", {});
+      g.appendChild(mk("rect", { x: lx - w / 2, y: ly - 9, width: w, height: 18, rx: 3, fill: "var(--bg)", stroke: style[0] }));
+      g.appendChild(mk("text", { x: lx, y: ly + 4, "text-anchor": "middle", fill: "var(--text)", "font-size": "10.5", "font-weight": "700" }, label));
+      g.appendChild(mk("title", {}, e.txt || ""));
+      labelLayer.appendChild(g);
+    });
+    sc.nodes.forEach(function (n) {
+      var p = pos[n.key], g = mk("g", { "class": "node", "data-key": n.key });
+      var lone = sc.comp && sc.comp[n.key] !== sc.comp[sc.nodes[0].key] && sc.how[n.key] !== "CROSS";
+      g.appendChild(mk("rect", { "class": "box", x: p.x, y: p.y, width: W, height: p.h, rx: 6, fill: "var(--panel)", stroke: lone ? "var(--danger)" : "var(--border)", "stroke-width": 1.5, "stroke-dasharray": lone ? "5,3" : "" }));
+      var tag = n.kind === "table" ? "" : n.kind === "cte" ? "CTE" : n.kind === "derived" ? "subquery" : n.kind === "temp" ? "temp" : n.kind === "function" ? "function" : n.kind;
+      g.appendChild(mk("text", { x: p.x + 10, y: p.y + 18, "font-weight": "700", fill: "var(--text)", "font-size": "13" }, clip(n.alias, 24)));
+      g.appendChild(mk("text", { x: p.x + 10, y: p.y + 33, fill: "var(--muted)", "font-size": "11" }, clip(n.name + (tag ? " · " + tag : "") + (n.filters ? " · " + n.filters + " filter" + (n.filters > 1 ? "s" : "") : ""), 36)));
+      g.appendChild(mk("line", { x1: p.x, y1: p.y + HH - 2, x2: p.x + W, y2: p.y + HH - 2, stroke: "var(--border)" }));
+      p.rows.forEach(function (r, i) {
+        var bg = mk("rect", { "class": "rowbg", x: p.x + 2, y: p.y + HH + i * RH + 1, width: W - 4, height: RH, rx: 3, "data-key": n.key, "data-col": r.c.toUpperCase() });
+        g.appendChild(bg);
+        var hit = mk("rect", { "class": "rowhit", x: p.x + 2, y: p.y + HH + i * RH + 1, width: W - 4, height: RH, fill: "transparent" });
+        hit.addEventListener("click", function (ev) { ev.stopPropagation(); reverseTrace(sc, n.key, r.c); });
+        g.appendChild(mk("text", { x: p.x + 10, y: p.y + HH + i * RH + 14, fill: r.j ? "var(--text)" : "var(--muted)", "font-weight": r.j ? "700" : "400", "font-family": "var(--mono)", "font-size": "11.5", "pointer-events": "none" }, (r.j ? "⚷ " : "") + clip(r.c, 30)));
+        g.appendChild(hit);
+      });
+      if (p.more) g.appendChild(mk("text", { x: p.x + 10, y: p.y + HH + p.rows.length * RH + 14, fill: "var(--muted)", "font-size": "11" }, "+ " + p.more + " more"));
+      if (!p.rows.length) g.appendChild(mk("text", { x: p.x + 10, y: p.y + HH + 14, fill: "var(--muted)", "font-size": "11", "font-style": "italic" }, "no qualified columns used"));
+      g.appendChild(mk("title", {}, n.name + (n.alias !== n.short ? " AS " + n.alias : "") + (n.kind === "cte" ? " (click to open the CTE)" : "")));
+      g.addEventListener("click", function () {
+        if (n.kind === "cte") { var i = STATE.scopes.findIndex(function (s) { return s.label.toUpperCase() === ("CTE " + n.short).toUpperCase(); }); if (i >= 0) { $("scope").value = i; draw(); return; } }
+        if (n.kind === "derived") { var j = STATE.scopes.findIndex(function (s) { return / /.test(s.label) && s.label.split(" ").pop().toUpperCase() === n.alias.toUpperCase(); }); if (j >= 0) { $("scope").value = j; draw(); return; } }
+        host.querySelectorAll(".node.sel").forEach(function (x) { x.classList.remove("sel"); }); g.classList.add("sel");
+      });
+      nodeLayer.appendChild(g);
+    });
+    host.appendChild(svg);
+  }
+
+  // ---------- Tracing ----------
+  function scopeIndexFor(node) {
+    if (node.kind === "cte") return STATE.scopes.findIndex(function (s) { return s.label.toUpperCase() === ("CTE " + node.short).toUpperCase(); });
+    if (node.kind === "derived") return STATE.scopes.findIndex(function (s) { return /^(Derived table|APPLY) /.test(s.label) && s.label.split(" ").pop().toUpperCase() === node.alias.toUpperCase(); });
+    return -1;
+  }
+  function findOut(sc, col) {
+    var c = col.toUpperCase();
+    return sc.outputs.filter(function (o) { return o.name.toUpperCase() === c; })[0] || sc.outputs.filter(function (o) { return o.star; })[0] || null;
+  }
+  // Follow one column of one table/alias back to where it really comes from
+  function traceSource(si, key, col, depth) {
+    var sc = STATE.scopes[si], node = sc && sc.byAlias[key];
+    if (!node) return { text: key + "." + col, note: "unknown table" };
+    var res = { si: si, key: key, col: col, text: node.alias + "." + col, table: node.name, kind: node.kind, kids: [] };
+    if ((node.kind === "cte" || node.kind === "derived") && depth < 12) {
+      var ci = scopeIndexFor(node);
+      if (ci >= 0) {
+        var out = col === "*" ? null : findOut(STATE.scopes[ci], col);
+        res.via = node.kind === "cte" ? "CTE " + node.short : "subquery " + node.alias;
+        res.childScope = ci;
+        if (col === "*") STATE.scopes[ci].outputs.forEach(function (o) { res.kids.push(traceOutput(ci, o, depth + 1, null)); });
+        else if (out) res.kids.push(traceOutput(ci, out, depth + 1, out.star ? col : null));
+        else res.note = "not found in " + res.via;
+      }
+    }
+    return res;
+  }
+  function traceOutput(si, out, depth, passCol) {
+    var sc = STATE.scopes[si], kids = [];
+    if (out.star) {
+      var col = passCol || "*";
+      (out.star === "ALL" ? sc.nodes : sc.nodes.filter(function (n) { return n.key === out.star; })).forEach(function (n) { kids.push(traceSource(si, n.key, col, depth)); });
+    } else {
+      out.refs.forEach(function (r) { kids.push(traceSource(si, r.key, r.col, depth)); });
+      out.unq.forEach(function (c) { kids.push({ text: c, note: "no table alias, so it could come from any table here" }); });
+    }
+    return { si: si, out: out, kids: kids, scopeLabel: sc.label };
+  }
+  function renderTrace(t, host, top) {
+    var box = el("div", "tr");
+    if (t.out) {
+      var line = el("div"); line.appendChild(el("span", "src", t.out.name));
+      if (!top) line.appendChild(el("span", "via", "  in " + t.scopeLabel));
+      box.appendChild(line);
+      if (t.out.expr && t.out.expr.toUpperCase() !== t.out.name.toUpperCase() && !/\.\s*$/.test(t.out.expr)) box.appendChild(el("div", "ex", "= " + t.out.expr));
+      if (!t.kids.length) box.appendChild(el("div", "via", /COUNT\s*\(\s*\*\s*\)/i.test(t.out.expr) ? "Row count: comes from the rows, not one column." : "No columns: a constant or a function with no column inputs."));
+    } else {
+      var l2 = el("div"); l2.appendChild(el("span", "src", t.text));
+      if (t.table && t.kind === "table" || t.kind === "temp" || t.kind === "function") l2.appendChild(el("span", "via", "  from " + t.table + (t.kind !== "table" ? " (" + t.kind + ")" : "")));
+      if (t.via) { var a = el("a", "", "  via " + t.via + " ↗"); a.title = "Open that part of the query"; a.addEventListener("click", function () { $("scope").value = t.childScope; draw(); }); l2.appendChild(a); }
+      if (t.note) l2.appendChild(el("span", "via", "  (" + t.note + ")"));
+      box.appendChild(l2);
+    }
+    t.kids.forEach(function (k) { renderTrace(k, box, false); });
+    host.appendChild(box);
+  }
+  function highlight(sc, pairs) {
+    var host = $("canvas");
+    host.querySelectorAll(".rowbg.hl").forEach(function (x) { x.classList.remove("hl"); });
+    host.querySelectorAll(".node.hl").forEach(function (x) { x.classList.remove("hl"); });
+    pairs.forEach(function (p) {
+      var n = host.querySelector('.node[data-key="' + p.key + '"]'); if (n) n.classList.add("hl");
+      var r = host.querySelector('.rowbg[data-key="' + p.key + '"][data-col="' + String(p.col).toUpperCase() + '"]'); if (r) r.classList.add("hl");
+    });
+  }
+  function drawOutputs(sc) {
+    var w = $("traceWrap"), outs = $("outs"); outs.innerHTML = ""; $("trace").innerHTML = "";
+    w.hidden = !sc.outputs || !sc.outputs.length;
+    if (w.hidden) return;
+    sc.outputs.forEach(function (o, i) {
+      var b = el("button", "", o.name); b.title = o.expr;
+      b.addEventListener("click", function () { selectOutput(sc, i); });
+      outs.appendChild(b);
+    });
+    var sel = STATE.sel;
+    if (sel && sel.scope === sc && sel.type === "out") selectOutput(sc, sel.i);
+    else if (sel && sel.scope === sc && sel.type === "col") reverseTrace(sc, sel.key, sel.col);
+    else if (sel && sel.type === "pending" && sel.scopeLabel === sc.label) { var oi = sc.outputs.findIndex(function (o) { return o.name.toUpperCase() === sel.name.toUpperCase(); }); if (oi >= 0) selectOutput(sc, oi); }
+  }
+  function selectOutput(sc, i) {
+    STATE.sel = { scope: sc, type: "out", i: i };
+    var si = STATE.scopes.indexOf(sc), t = traceOutput(si, sc.outputs[i], 0, null);
+    $("outs").querySelectorAll("button").forEach(function (b, j) { b.classList.toggle("on", j === i); b.classList.remove("used"); });
+    var host = $("trace"); host.innerHTML = ""; renderTrace(t, host, true);
+    var direct = t.kids.filter(function (k) { return k.key; }).map(function (k) { return { key: k.key, col: k.col }; });
+    highlight(sc, direct);
+  }
+  function reverseTrace(sc, key, col) {
+    STATE.sel = { scope: sc, type: "col", key: key, col: col };
+    var C = col.toUpperCase(), users = [];
+    sc.outputs.forEach(function (o, i) {
+      var uses = o.refs.some(function (r) { return r.key === key && r.col.toUpperCase() === C; }) || (o.star && (o.star === "ALL" || o.star === key));
+      if (uses) users.push(i);
+    });
+    $("outs").querySelectorAll("button").forEach(function (b, j) { b.classList.remove("on"); b.classList.toggle("used", users.indexOf(j) >= 0); });
+    var node = sc.byAlias[key], host = $("trace"); host.innerHTML = "";
+    var box = el("div", "tr"), l = el("div"); l.appendChild(el("span", "src", node.alias + "." + col)); l.appendChild(el("span", "via", "  (" + node.name + ")")); box.appendChild(l);
+    box.appendChild(el("div", "", users.length ? "Used by output column" + (users.length > 1 ? "s" : "") + ": " + users.map(function (i) { return sc.outputs[i].name; }).join(", ") : "Not used in the output; it's only used in joins or filters."));
+    host.appendChild(box);
+    highlight(sc, [{ key: key, col: col }]);
+  }
+
+  function mermaid() {
+    var sc = STATE.scopes[+$("scope").value]; if (!sc) return "";
+    var id = function (k) { return k.replace(/[^A-Za-z0-9_]/g, "_"); };
+    var L = ["flowchart LR"];
+    sc.nodes.forEach(function (n) { L.push("    " + id(n.key) + "[\"" + (n.name + (n.alias !== n.short ? " " + n.alias : "")).replace(/"/g, "'") + "\"]"); });
+    sc.edges.forEach(function (e) {
+      var A = sc.nodes.filter(function (n) { return n.key === e.a; })[0], B = sc.nodes.filter(function (n) { return n.key === e.b; })[0];
+      var lab = e.type + ": " + e.pairs.map(function (p) { return p[0] === "(inside)" ? A.alias + "." + p[1] : A.alias + "." + p[1] + " = " + B.alias + "." + p[0]; }).join(", ");
+      var arrow = /LEFT|RIGHT|FULL/.test(e.type) ? "-.->" : e.type === "WHERE" ? "-.-" : "-->";
+      L.push("    " + id(e.a) + " " + arrow + "|\"" + clip(lab, 60).replace(/"/g, "'") + "\"| " + id(e.b));
+    });
+    return L.join("\n");
+  }
+
+  var SAMPLE = [
+    "WITH cur AS (",
+    "    SELECT pu.ID, pu.PERSON_CODE, pu.UIO_ID",
+    "    FROM PEOPLE_UNITS pu",
+    "    WHERE pu.CALOCC = 27",
+    ")",
+    "SELECT p.PERSON_CODE, p.SURNAME, uio.TITLE, la.AIM_TYPE, v.VERIFIER, att.PCT",
+    "FROM PEOPLE p",
+    "JOIN cur ON cur.PERSON_CODE = p.PERSON_CODE",
+    "JOIN UNIT_INSTANCE_OCCURRENCES uio ON uio.UIO_ID = cur.UIO_ID",
+    "LEFT JOIN LEARNER_AIMS la ON la.PEOPLE_UNITS_ID = cur.ID",
+    "JOIN AIM_TYPES at ON at.CODE = la.AIM_TYPE",
+    "OUTER APPLY (SELECT TOP 1 vf.VERIFIER FROM VERIFIERS vf",
+    "             WHERE vf.PERSON_CODE = p.PERSON_CODE ORDER BY vf.DATE DESC) v",
+    "LEFT JOIN ATTENDANCE_SUMMARY att ON att.PEOPLE_UNITS_ID = cur.ID",
+    "JOIN CAMPUSES c ON c.ACTIVE = 'Y'",
+    "WHERE la.AIM_TYPE <> 'X'",
+    "  AND p.AVAILABILITY_CODE <> 'U'"
+  ].join("\n");
+
+  var t; $("sql").addEventListener("input", function () { clearTimeout(t); t = setTimeout(run, 250); });
+  $("scope").addEventListener("change", draw);
+  $("allCols").addEventListener("change", draw);
+  $("fit").addEventListener("change", draw);
+  $("sample").addEventListener("click", function () { $("sql").value = SAMPLE; run(); });
+  function erdName() { var sc = STATE.scopes && STATE.scopes[+$("scope").value]; return "Query ERD" + (sc && sc.label && sc.label !== "Main query" ? " - " + sc.label : ""); }
+  function erdSvg() { var g = $("canvas").querySelector("svg"); if (!g) { alert("Paste a query first."); return null; } return g; }
+  $("expSvg").addEventListener("click", function () { var g = erdSvg(); if (g) BITK_EXPORT.svg(g, erdName()); });
+  $("expPdf").addEventListener("click", function () { var g = erdSvg(); if (g) BITK_EXPORT.pdf(g, erdName()); });
+  $("expPng").addEventListener("click", function () { var g = erdSvg(); if (g) BITK_EXPORT.png(g, erdName()); });
+  $("mermaid").addEventListener("click", function () { var b = this, m = mermaid(); if (m && navigator.clipboard) navigator.clipboard.writeText(m).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy Mermaid"; }, 1200); }); });
+  $("toChecker").addEventListener("click", function () { var s = $("sql").value; if (s.trim() && window.BITK && BITK.give({ tool: "sql", files: [{ name: "query.sql", text: s }] })) window.open("../sql-checker/index.html", "_blank"); });
+  var hand = window.BITK && BITK.take();
+  if (hand && hand.tool === "erd" && hand.files && hand.files[0]) { $("sql").value = hand.files[0].text; run(); }
+  else fanOut({ joins: [] });
+})();
+</script>
+<script src="../../assets/export.js"></script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>

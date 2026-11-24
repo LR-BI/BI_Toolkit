@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Academic Year &amp; ILR Dates · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  tr.now td { background: var(--panel); font-weight: 600; }
+  .why { font-size: 14px; margin-top: .75rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Academic Year &amp; ILR Dates</h1>
+  <p class="lead">Turns a date into an academic year, ILR period and return. Also works out funding age and QAR hybrid end year, and gives the matching T-SQL.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li><strong>Date to academic year:</strong> pick a date (or click Today) to get the academic year, CALOCC, ILR period and which return collects it.</li>
+      <li><strong>Funding age:</strong> enter a date of birth and pick the academic year to get age on 31 August and the 16 to 18 band. Add a date to get age on that day, e.g. an apprenticeship start.</li>
+      <li><strong>QAR hybrid end year:</strong> enter planned end, actual end and (for FM36 standards) achievement date. It shows the year the aim counts in and why.</li>
+      <li>Each section has T-SQL underneath that does the same thing. Click Copy and swap in your column names.</li>
+      <li>The returns table highlights the next ILR deadline. Close dates are only loaded for 2026 to 2027.</li>
+    </ol>
+  </details>
+
+  <!-- 1. Date to academic year -->
+  <h2>Date to academic year</h2>
+  <div class="row">
+    <div class="field">
+      <label for="d">Date</label>
+      <input id="d" type="date">
+    </div>
+    <button id="today">Today</button>
+  </div>
+  <div class="err" id="dErr"></div>
+  <div class="cards">
+    <div class="card"><div class="k">Academic year</div><div class="v"><span id="oLabel">-</span><button data-copy="oLabel">Copy</button></div></div>
+    <div class="card"><div class="k">CALOCC</div><div class="v"><span id="oCal">-</span><button data-copy="oCal">Copy</button></div></div>
+    <div class="card"><div class="k">Runs</div><div class="v" style="font-size:16px"><span id="oRange">-</span></div></div>
+    <div class="card"><div class="k">ILR period (month)</div><div class="v"><span id="oPeriod">-</span></div></div>
+    <div class="card"><div class="k">Week of year</div><div class="v"><span id="oWeek">-</span></div></div>
+  </div>
+  <div class="meta" id="oReturn"></div>
+  <div class="sqlwrap"><pre id="sqlAy"></pre><button data-copy="sqlAy">Copy</button></div>
+
+  <!-- 2. Age -->
+  <h2>Funding age</h2>
+  <div class="row">
+    <div class="field">
+      <label for="dob">Date of birth</label>
+      <input id="dob" type="date">
+    </div>
+    <div class="field">
+      <label for="ageAy">Academic year</label>
+      <select id="ageAy"></select>
+    </div>
+    <div class="field">
+      <label for="ageAt">Or age on a date (e.g. apprenticeship start)</label>
+      <input id="ageAt" type="date">
+    </div>
+  </div>
+  <div class="err" id="ageErr"></div>
+  <div class="cards">
+    <div class="card"><div class="k">Age on 31 August</div><div class="v"><span id="aAug">-</span></div></div>
+    <div class="card"><div class="k">16 to 19 band</div><div class="v" style="font-size:18px"><span id="aBand">-</span></div></div>
+    <div class="card"><div class="k">Age on chosen date</div><div class="v"><span id="aAt">-</span></div></div>
+  </div>
+  <div class="meta">16 to 19 funding and bursary use age on 31 August at the start of the academic year: 16 or over but under 19. Apprenticeships use age at the start date.</div>
+  <div class="sqlwrap"><pre id="sqlAge"></pre><button data-copy="sqlAge">Copy</button></div>
+
+  <!-- 3. Hybrid end year -->
+  <h2>QAR hybrid end year</h2>
+  <div class="row">
+    <div class="field">
+      <label for="ped">Planned end date</label>
+      <input id="ped" type="date">
+    </div>
+    <div class="field">
+      <label for="aed">Actual end date</label>
+      <input id="aed" type="date">
+    </div>
+    <div class="field">
+      <label for="ach">Achievement date</label>
+      <input id="ach" type="date">
+    </div>
+    <div class="field">
+      <label for="repYr">Reporting year</label>
+      <select id="repYr"></select>
+    </div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <label class="inline"><input type="checkbox" id="fm36" checked> Apprenticeship standard (FM36), so achievement date counts</label>
+  </div>
+  <div class="err" id="hErr"></div>
+  <div class="cards">
+    <div class="card"><div class="k">Hybrid end year</div><div class="v"><span id="hYr">-</span></div></div>
+  </div>
+  <div class="why" id="hWhy"></div>
+  <div class="sqlwrap"><pre id="sqlHey"></pre><button data-copy="sqlHey">Copy</button></div>
+
+  <!-- 4. Returns -->
+  <h2>ILR returns 2026 to 2027</h2>
+  <p class="meta" style="margin-top:0">Collection closes 6pm on the date shown. From the <a href="https://guidance.submit-learner-data.service.gov.uk/26-27/data-collection-timetable">DfE data collection timetable</a>; check there before relying on a date.</p>
+  <table id="rTable">
+    <thead><tr><th>Return</th><th>Covers</th><th>Closes</th><th>Reference date</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <details>
+    <summary>Rules used</summary>
+    <p><strong>Academic year:</strong> 1 August to 31 July. A date in August 2026 to July 2027 is <code>26/27</code>.</p>
+    <p><strong>CALOCC:</strong> last two digits of the academic year's end year, as returned by <code>[dbo].[bc_InstitutionSettingsCALOCC]()</code>. 26/27 is 27.</p>
+    <p><strong>ILR period:</strong> August is period 1, July is period 12. R13 and R14 are the year-end returns, after July, with a reference date of 31 July.</p>
+    <p><strong>Age:</strong> whole years. A 29 February birthday counts from 1 March in non-leap years.</p>
+    <p><strong>Hybrid end year:</strong> the latest of the planned end year, actual end year, achievement year (apprenticeship standards on FM36 only) and reporting year. So a withdrawal counts in the year of its planned end date if that is later than the withdrawal.</p>
+  </details>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  // 2026 to 2027 timetable (DfE). [return, close date, reference date]
+  var RETURNS_2026 = [
+    ["R01","2026-09-04",""], ["R02","2026-10-06",""], ["R03","2026-11-05",""],
+    ["R04","2026-12-04","2026-11-01"], ["R05","2027-01-07",""], ["R06","2027-02-04","2027-01-01"],
+    ["R07","2027-03-04",""], ["R08","2027-04-06",""], ["R09","2027-05-07",""],
+    ["R10","2027-06-04","2027-05-01"], ["R11","2027-07-06",""], ["R12","2027-08-05",""],
+    ["R13","2027-09-14","2027-07-31"], ["R14","2027-10-21","2027-07-31"]
+  ];
+
+  // Dates as plain {y,m,d} parsed from yyyy-mm-dd, so no time zone drift
+  function parse(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
+    return m ? { y: +m[1], m: +m[2], d: +m[3] } : null;
+  }
+  function fmt(p) { return p.d + " " + MONTHS[p.m - 1] + " " + p.y; }
+  function fmtIso(s) { return fmt(parse(s)); }
+  function ayStart(p) { return p.m >= 8 ? p.y : p.y - 1; }
+  function label(y) { return String(y).slice(2) + "/" + String(y + 1).slice(2); }
+  function calocc(y) { return String((y + 1) % 100).padStart(2, "0"); } // 26/27 -> 27
+  function period(p) { return (p.m + 4) % 12 + 1; }
+  function toUtc(p) { return Date.UTC(p.y, p.m - 1, p.d); }
+  function age(dob, on) {
+    var a = on.y - dob.y;
+    if (on.m < dob.m || (on.m === dob.m && on.d < dob.d)) a--;
+    return a;
+  }
+  function todayIso() {
+    var t = new Date();
+    return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+  }
+
+  // Year dropdowns
+  var curAy = ayStart(parse(todayIso()));
+  [$("ageAy"), $("repYr")].forEach(function (sel) {
+    for (var y = curAy + 2; y >= curAy - 6; y--) {
+      var o = document.createElement("option"); o.value = y; o.textContent = label(y) + " (" + y + " to " + (y + 1) + ")";
+      if (y === curAy) o.selected = true;
+      sel.appendChild(o);
+    }
+  });
+
+  // 1. Academic year
+  function doAy() {
+    var p = parse($("d").value), err = $("dErr");
+    if (!p) { err.textContent = $("d").value ? "Enter a valid date" : ""; ["oLabel","oCal","oRange","oPeriod","oWeek"].forEach(function (id) { $(id).textContent = "-"; }); $("oReturn").textContent = ""; return; }
+    err.textContent = "";
+    var y = ayStart(p), per = period(p);
+    $("oLabel").textContent = label(y);
+    $("oCal").textContent = calocc(y);
+    $("oRange").textContent = "1 Aug " + y + " to 31 Jul " + (y + 1);
+    $("oPeriod").textContent = "P" + String(per).padStart(2, "0") + " (" + MONTHS[p.m - 1] + ")";
+    var days = Math.floor((toUtc(p) - Date.UTC(y, 7, 1)) / 86400000);
+    $("oWeek").textContent = Math.floor(days / 7) + 1;
+    var r = y === 2026 ? RETURNS_2026[per - 1] : null;
+    $("oReturn").textContent = r
+      ? "First collected in " + r[0] + ", which closes " + fmtIso(r[1]) + ". Last chance to change it for funding: R14, closes " + fmtIso(RETURNS_2026[13][1]) + "."
+      : "First collected in R" + String(per).padStart(2, "0") + " of " + label(y) + ". Exact close dates only loaded for 26/27.";
+  }
+
+  // 2. Age
+  function doAge() {
+    var dob = parse($("dob").value), err = $("ageErr");
+    ["aAug","aBand","aAt"].forEach(function (id) { $(id).textContent = "-"; });
+    if (!dob) { err.textContent = ""; return; }
+    var y = +$("ageAy").value, aug = { y: y, m: 8, d: 31 };
+    if (toUtc(dob) > toUtc(aug)) { err.textContent = "Date of birth is after 31 August " + y; return; }
+    err.textContent = "";
+    var a = age(dob, aug);
+    $("aAug").textContent = a;
+    $("aBand").textContent = a < 16 ? "Under 16" : a < 19 ? "16 to 18" : "19+";
+    var at = parse($("ageAt").value);
+    if (at) $("aAt").textContent = toUtc(at) < toUtc(dob) ? "Before birth" : age(dob, at);
+  }
+
+  // 3. Hybrid end year
+  function doHey() {
+    var ped = parse($("ped").value), aed = parse($("aed").value), ach = parse($("ach").value);
+    var rep = +$("repYr").value, fm36 = $("fm36").checked;
+    $("ach").disabled = !fm36;
+    var err = $("hErr");
+    if (!ped) { err.textContent = "Planned end date is needed"; $("hYr").textContent = "-"; $("hWhy").textContent = ""; return; }
+    err.textContent = "";
+    var parts = [["planned end year", ayStart(ped)], ["reporting year", rep]];
+    if (aed) parts.push(["actual end year", ayStart(aed)]);
+    if (fm36 && ach) parts.push(["achievement year", ayStart(ach)]);
+    var max = Math.max.apply(null, parts.map(function (x) { return x[1]; }));
+    var wins = parts.filter(function (x) { return x[1] === max; }).map(function (x) { return x[0]; });
+    $("hYr").textContent = label(max) + " (CALOCC " + calocc(max) + ")";
+    var txt = "Counts in " + label(max) + " because the " + wins.join(" and the ") + (wins.length > 1 ? " are" : " is") + " the latest. ";
+    txt += parts.map(function (x) { return x[0] + ": " + label(x[1]); }).join(" · ");
+    if (!aed && max === rep) txt += ". No actual end date, so if the learner is still continuing they won't be in this year's QAR as a leaver.";
+    $("hWhy").textContent = txt;
+  }
+
+  // Returns table
+  function doReturns() {
+    var tb = $("rTable").querySelector("tbody"), t = todayIso(), nextDone = false;
+    RETURNS_2026.forEach(function (r, i) {
+      var tr = document.createElement("tr");
+      if (!nextDone && r[1] >= t) { tr.className = "now"; nextDone = true; }
+      var covers = i < 12 ? MONTHS[(i + 7) % 12] + " " + (i < 5 ? 2026 : 2027) : "Year-end";
+      [r[0] + (tr.className ? " (next)" : ""), covers, fmtIso(r[1]), r[2] ? fmtIso(r[2]) : ""].forEach(function (v) {
+        var td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  }
+
+  // SQL snippets (static)
+  $("sqlAy").textContent =
+"-- Academic year from a date (Aug to Jul)\n" +
+"SELECT\n" +
+"    YEAR(DATEADD(MONTH, -7, d.DT))                    AS AY_Start_Year,   -- 2026\n" +
+"    RIGHT(CAST(YEAR(DATEADD(MONTH, -7, d.DT))     AS varchar(4)), 2) + '/' +\n" +
+"    RIGHT(CAST(YEAR(DATEADD(MONTH, -7, d.DT)) + 1 AS varchar(4)), 2) AS AY_Label, -- '26/27'\n" +
+"    (YEAR(DATEADD(MONTH, -7, d.DT)) + 1) % 100        AS CALOCC,          -- 27, matches bc_InstitutionSettingsCALOCC()\n" +
+"    (MONTH(d.DT) + 4) % 12 + 1                        AS ILR_Period       -- Aug = 1, Jul = 12\n" +
+"FROM (SELECT CAST(GETDATE() AS date) AS DT) d;";
+
+  $("sqlAge").textContent =
+"-- Age in whole years on a date. Safe for 29 Feb birthdays.\n" +
+"-- @AYStart = academic year start year, e.g. 2026\n" +
+"SELECT\n" +
+"    (CONVERT(int, CONVERT(char(8), DATEFROMPARTS(@AYStart, 8, 31), 112))\n" +
+"   - CONVERT(int, CONVERT(char(8), p.DATE_OF_BIRTH, 112))) / 10000 AS Age_31_Aug\n" +
+"FROM PEOPLE p;";
+
+  $("sqlHey").textContent =
+"-- QAR hybrid end year (as AY start year). @ReportingYear e.g. 2026\n" +
+"-- Achievement year only for apprenticeship standards (FM36)\n" +
+"SELECT\n" +
+"    (SELECT MAX(v) FROM (VALUES\n" +
+"        (YEAR(DATEADD(MONTH, -7, a.PlannedEndDate))),\n" +
+"        (YEAR(DATEADD(MONTH, -7, a.ActualEndDate))),\n" +
+"        (CASE WHEN a.FundModel = 36 THEN YEAR(DATEADD(MONTH, -7, a.AchDate)) END),\n" +
+"        (@ReportingYear)\n" +
+"    ) x(v)) AS Hybrid_End_Year\n" +
+"FROM aims a;  -- swap in your table and column names";
+
+  // Copy buttons
+  document.querySelectorAll("[data-copy]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var t = $(b.getAttribute("data-copy")).textContent;
+      if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1200); });
+    });
+  });
+
+  $("d").addEventListener("input", doAy);
+  $("today").addEventListener("click", function () { $("d").value = todayIso(); doAy(); });
+  ["dob","ageAy","ageAt"].forEach(function (id) { $(id).addEventListener("input", doAge); $(id).addEventListener("change", doAge); });
+  ["ped","aed","ach","repYr","fm36"].forEach(function (id) { $(id).addEventListener("input", doHey); $(id).addEventListener("change", doHey); });
+
+  $("d").value = todayIso();
+  doAy(); doAge(); doReturns(); doHey();
+  $("hErr").textContent = "";
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>

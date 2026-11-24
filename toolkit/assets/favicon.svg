@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Simple penguin: palette #c8bfff #9e89ff #765de5 #522fb6 #2e176d -->
+  <ellipse cx="17" cy="38" rx="6" ry="13" fill="#2e176d" transform="rotate(18 17 38)"/>
+  <ellipse cx="47" cy="38" rx="6" ry="13" fill="#2e176d" transform="rotate(-18 47 38)"/>
+  <ellipse cx="32" cy="35" rx="17" ry="25" fill="#2e176d"/>
+  <ellipse cx="32" cy="41" rx="11.5" ry="17" fill="#ffffff"/>
+  <path d="M20 26 C20 15 44 15 44 26 C40 23 36 24 32 27 C28 24 24 23 20 26 Z" fill="#2e176d"/>
+  <circle cx="26.5" cy="24" r="3.6" fill="#ffffff"/>
+  <circle cx="37.5" cy="24" r="3.6" fill="#ffffff"/>
+  <circle cx="27.3" cy="24.6" r="1.9" fill="#160c38"/>
+  <circle cx="36.7" cy="24.6" r="1.9" fill="#160c38"/>
+  <path d="M27.5 29 L36.5 29 L32 35 Z" fill="#9e89ff"/>
+  <ellipse cx="25" cy="60" rx="6" ry="2.6" fill="#9e89ff"/>
+  <ellipse cx="39" cy="60" rx="6" ry="2.6" fill="#9e89ff"/>
+</svg>
