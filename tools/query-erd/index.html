@@ -50,6 +50,7 @@
       <li>Wide diagrams shrink to fit the page; untick <strong>Fit to width</strong> to see them full size and drag to move around.</li>
       <li>Each box is a table (or CTE, derived table or APPLY) with its alias, the join columns in bold and the other columns the query uses. Lines show joins: solid for INNER, dashed for LEFT/RIGHT/FULL, dotted for joins written in WHERE, orange for APPLY.</li>
       <li>Queries with CTEs or subqueries have several parts: pick one under <strong>Part of query</strong>. Click a CTE box to jump to it.</li>
+      <li><strong>Download SVG / PDF / PNG</strong> saves the diagram you can see (the part of the query picked in the list). Exports always use light colours so they print well.</li>
       <li><strong>Trace a column</strong>: click any output column to follow it back through CTEs and subqueries to the table it really comes from (the path lights up in the diagram). Click a column inside a box to see which outputs use it.</li>
       <li><strong>What to look at</strong> lists problems; the <strong>Joins</strong> table lists every join in order with its full ON condition.</li>
       <li>If you've loaded a database in the <strong>Schema Map</strong> tool, its primary keys are used here to flag joins that don't use the whole key and so can return several rows per row.</li>
@@ -65,6 +66,9 @@
     <label class="inline"><input type="checkbox" id="fit" checked> Fit to width</label>
     <button id="sample">Load sample</button>
     <button id="mermaid">Copy Mermaid</button>
+    <button id="expSvg">Download SVG</button>
+    <button id="expPdf">Download PDF</button>
+    <button id="expPng">PNG</button>
     <button id="toChecker">Open in SQL Checker</button>
   </div>
   <div class="meta schema-note" id="schemaNote"></div>
@@ -718,6 +722,11 @@
   $("allCols").addEventListener("change", draw);
   $("fit").addEventListener("change", draw);
   $("sample").addEventListener("click", function () { $("sql").value = SAMPLE; run(); });
+  function erdName() { var sc = STATE.scopes && STATE.scopes[+$("scope").value]; return "Query ERD" + (sc && sc.label && sc.label !== "Main query" ? " - " + sc.label : ""); }
+  function erdSvg() { var g = $("canvas").querySelector("svg"); if (!g) { alert("Paste a query first."); return null; } return g; }
+  $("expSvg").addEventListener("click", function () { var g = erdSvg(); if (g) BITK_EXPORT.svg(g, erdName()); });
+  $("expPdf").addEventListener("click", function () { var g = erdSvg(); if (g) BITK_EXPORT.pdf(g, erdName()); });
+  $("expPng").addEventListener("click", function () { var g = erdSvg(); if (g) BITK_EXPORT.png(g, erdName()); });
   $("mermaid").addEventListener("click", function () { var b = this, m = mermaid(); if (m && navigator.clipboard) navigator.clipboard.writeText(m).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy Mermaid"; }, 1200); }); });
   $("toChecker").addEventListener("click", function () { var s = $("sql").value; if (s.trim() && window.BITK && BITK.give({ tool: "sql", files: [{ name: "query.sql", text: s }] })) window.open("../sql-checker/index.html", "_blank"); });
   var hand = window.BITK && BITK.take();
@@ -725,6 +734,7 @@
   else fanOut({ joins: [] });
 })();
 </script>
+<script src="../../assets/export.js"></script>
 <script src="../../assets/tools.js"></script>
 <script src="../../assets/shell.js"></script>
 <script src="../../assets/howto.js"></script>
