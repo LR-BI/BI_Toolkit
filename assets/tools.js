@@ -13,14 +13,15 @@ window.TOOL_ICONS = {
   "rdl-inspector": '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4.5"/><path d="M14 3v6h6v2.5"/><circle cx="16" cy="16.5" r="3.2"/><path d="M18.4 18.9L21 21.5"/>',
   "ssrs-expressions": '<path d="M8.5 20c2 0 2.6-1.4 3-3.8l1.6-8.4c.4-2.4 1-3.8 3-3.8"/><path d="M8 10.5h7"/><path d="M15.5 13.5l5 5.5M20.5 13.5l-5 5.5"/>',
   "excel-to-ssrs": '<rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M6 7v3.5M10 7v5M14 7v3.5M18 7v5"/>',
+  "flowchart": '<rect x="7" y="2" width="10" height="5" rx="2.5"/><path d="M12 7v2.5"/><path d="M12 9.5l5 3.5-5 3.5-5-3.5z"/><path d="M17 13h2.5V19H14.5"/><rect x="5" y="17" width="9.5" height="4.5" rx="1"/>',
   "password": '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L20 3"/><path d="M17 6l3 3M14.5 8.5l2.5 2.5"/>'
 };
 // Tool list. Add one entry per tool; the hub builds itself from this.
 // cat: category heading on the hub. icon: 1-3 letters for the tile.
-window.CATEGORIES = ["SQL Server", "EBS & ILR", "Reporting", "Admin"];
+window.CATEGORIES = ["SQL Server", "EBS & ILR", "Reporting", "Diagrams", "Admin"];
 window.TOOLS = [
   { cat: "SQL Server", icon: "SQL", name: "SQL Checker", path: "tools/sql-checker/index.html", svg: "sql-checker",
-    desc: "Catch AND/OR slips, NOT IN NULL traps, uncorrelated EXISTS, LEFT JOIN filters, integer division, risky dates and EBS validator rejects.",
+    desc: "Seven-step check of a T-SQL query: syntax slips SQL Server rejects, unknown aliases, GROUP BY mistakes, join and NULL traps, and (with Schema Map) missing tables and columns.",
     tags: ["SQL", "EBS", "lint"] },
   { cat: "SQL Server", icon: "QP", name: "Query Plan Reader", path: "tools/plan-reader/index.html", svg: "plan-reader",
     desc: "Drop in a .sqlplan: costly steps, scans, key lookups, bad estimates, fan-out, spills, per-row functions, missing indexes.",
@@ -58,6 +59,9 @@ window.TOOLS = [
   { cat: "Reporting", icon: "XL", name: "Excel to SSRS Width Converter", path: "tools/excel-to-ssrs/index.html", svg: "excel-to-ssrs",
     desc: "Excel column widths and row heights to cm / in / px for SSRS, based on the workbook's default font.",
     tags: ["SSRS", "Excel"] },
+  { cat: "Diagrams", icon: "FC", name: "Flowchart Builder", path: "tools/flowchart/index.html", svg: "flowchart",
+    desc: "Draw process maps with swimlanes, decisions and connectors, or build one from a list of steps. Export to SVG, PDF, PNG or Mermaid.",
+    tags: ["flowchart", "process", "visio", "diagram", "swimlane", "map"] },
   { cat: "Admin", icon: "PW", name: "Random Password Generator", path: "tools/password/index.html", svg: "password",
     desc: "Easy-to-read Colour + Animal + number + symbol passwords, one at a time or in a batch.",
     tags: ["accounts", "password"] }
