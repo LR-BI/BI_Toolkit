@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ontrack Field Helper · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  .grid2 { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  #fields { min-height: 120px; }
+  .sel td { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+  .sel td:first-child { font-family: var(--ui); font-size: 13.5px; color: var(--muted); white-space: nowrap; word-break: normal; }
+  .snips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .snips button { min-height: 0; padding: 4px 12px; font-size: 13px; }
+  .snips button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .sticky { position: sticky; top: 62px; }
+  .fieldhead { font-weight: 700; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ontrack Field Helper</h1>
+  <p class="lead">Type an EBS field name and get the selectors for its input, its hidden twin and its read-only display, plus ready-made jQuery snippets for Screen Designer CustomHTML controls.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li>Enter the <strong>DataLink</strong> name (e.g. <code>PersonDetails</code>), the row (usually 0) and one or more field names, one per line.</li>
+      <li><strong>Selectors</strong> shows how to reach each field: the visible input (matched on the end of its <code>name</code>, skipping hidden inputs), the hidden <code>.OriginalItem.Value</code> twin, and the <code>…_DISP</code> span used when the field is read-only.</li>
+      <li>Pick a <strong>snippet</strong>: read or set a value, wait for a field to appear, re-run after each ajax refresh, default a blank field, show/hide another field, or style grid cells. Your fields are filled in for you.</li>
+      <li>Copy it into a CustomHTML control inside <code>&lt;script&gt;…&lt;/script&gt;</code>. The helpers block at the top is only needed once per screen.</li>
+      <li>Screens differ, so check the selector in F12 (Console: <code>$('…').length</code> should be 1) before relying on it.</li>
+    </ol>
+  </details>
+
+  <div class="grid2">
+    <div class="sticky">
+      <div class="field"><label for="dl">DataLink</label><input id="dl" type="text" value="PersonDetails"></div>
+      <div class="field" style="margin-top:10px"><label for="row">Row (Data[n])</label><input id="row" type="number" min="0" value="0" style="width:90px"></div>
+      <div class="field" style="margin-top:10px"><label for="fields">Field names (one per line)</label><textarea id="fields" spellcheck="false">EMPLOYMENT_STATUS
+DATE_OF_BIRTH</textarea></div>
+      <div class="field" style="margin-top:10px"><label for="val">Value for "set" / "default" snippets</label><input id="val" type="text" value="10"></div>
+      <div class="field" style="margin-top:10px"><label for="grid">Grid selector (grid snippet)</label><input id="grid" type="text" value="#MyGrid"></div>
+      <label class="inline" style="margin-top:6px"><input type="checkbox" id="vanilla"> Plain JavaScript (no jQuery)</label>
+    </div>
+    <div>
+      <h2 style="margin-top:0">Selectors</h2>
+      <div id="sels"></div>
+
+      <h2>Snippets</h2>
+      <div class="snips" id="snips">
+        <button data-s="helpers" class="on">Helpers</button>
+        <button data-s="get">Read value</button>
+        <button data-s="set">Set value</button>
+        <button data-s="ready">Wait for field</button>
+        <button data-s="ajax">After ajax refresh</button>
+        <button data-s="default">Default if blank</button>
+        <button data-s="toggle">Show / hide a field</button>
+        <button data-s="grid">Style grid cells</button>
+      </div>
+      <p class="meta" id="snipNote" style="margin-top:0"></p>
+      <div class="sqlwrap"><pre id="code"></pre><button id="copy">Copy</button></div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var snip = "helpers";
+
+  function cfg() {
+    return {
+      dl: $("dl").value.trim() || "PersonDetails", row: Math.max(0, parseInt($("row").value, 10) || 0),
+      fields: $("fields").value.split(/[\s,]+/).map(function (f) { return f.trim().toUpperCase(); }).filter(Boolean),
+      val: $("val").value, grid: $("grid").value.trim() || "#MyGrid", vanilla: $("vanilla").checked
+    };
+  }
+  function q(s) { return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'"; }
+
+  function selectors(c, f) {
+    var tail = "DataLinks[" + c.dl + "].Data[" + c.row + "].Items[" + f + "]";
+    return {
+      name: "DataModel." + tail + ".Value",
+      input: '[name$="' + tail + '.Value"]:not([type="hidden"])',
+      twin: '[name$="' + tail + '.OriginalItem.Value"]',
+      disp: '[id*="_Items_' + f + '__Value_"][id$="_DISP"]'
+    };
+  }
+
+  function drawSelectors() {
+    var c = cfg(), w = $("sels"); w.innerHTML = "";
+    if (!c.fields.length) { w.innerHTML = '<p class="meta">Add a field name.</p>'; return; }
+    c.fields.forEach(function (f) {
+      var s = selectors(c, f);
+      var h = document.createElement("div"); h.className = "fieldhead"; h.textContent = f; w.appendChild(h);
+      var t = document.createElement("table"); t.className = "sel";
+      var rows = [
+        ["Input name", s.name],
+        ["Visible input", c.vanilla ? "document.querySelector('" + s.input + "')" : "$('" + s.input + "')"],
+        ["Hidden twin", c.vanilla ? "document.querySelector('" + s.twin + "')" : "$('" + s.twin + "')"],
+        ["Read-only text", c.vanilla ? "document.querySelector('" + s.disp + "')" : "$('" + s.disp + "')"],
+        ["Check in F12", "$('" + s.input + "').length + ' input, ' + $('" + s.disp + "').length + ' display'"]
+      ];
+      rows.forEach(function (r) {
+        var tr = document.createElement("tr");
+        var a = document.createElement("td"); a.textContent = r[0];
+        var b = document.createElement("td"); b.textContent = r[1]; b.title = "Click to copy"; b.style.cursor = "copy";
+        b.addEventListener("click", function () { if (navigator.clipboard) navigator.clipboard.writeText(r[1]).then(function () { b.style.background = "var(--tint)"; setTimeout(function () { b.style.background = ""; }, 600); }); });
+        tr.appendChild(a); tr.appendChild(b); t.appendChild(tr);
+      });
+      w.appendChild(t);
+    });
+  }
+
+  var HELP_JQ = [
+    "// ---- EBS field helpers (paste once per screen) ----",
+    "function ebsTail(dl, row, field) { return 'DataLinks[' + dl + '].Data[' + row + '].Items[' + field + ']'; }",
+    "// Visible input for a field (empty jQuery object if the field is read-only)",
+    "function ebsInput(field, dl, row) {",
+    "  return $('[name$=\"' + ebsTail(dl || 'DL', row || 0, field) + '.Value\"]').not('[type=\"hidden\"]');",
+    "}",
+    "// Read-only display span (used instead of an input when the field is locked)",
+    "function ebsDisplay(field) { return $('[id*=\"_Items_' + field + '__Value_\"][id$=\"_DISP\"]'); }",
+    "// Value whether the field is editable or read-only",
+    "function ebsGet(field, dl, row) {",
+    "  var $i = ebsInput(field, dl, row);",
+    "  return String($i.length ? $i.val() : ebsDisplay(field).text()).trim();",
+    "}",
+    "// Set a value and fire change so EBS picks it up",
+    "function ebsSet(field, value, dl, row) {",
+    "  var $i = ebsInput(field, dl, row);",
+    "  $i.val(value).each(function () {   // real events, so EBS and jQuery handlers both see it",
+    "    this.dispatchEvent(new Event('input', { bubbles: true }));",
+    "    this.dispatchEvent(new Event('change', { bubbles: true }));",
+    "  });",
+    "  return $i.length > 0;",
+    "}",
+    "// Run fn once the selector exists (screens render after page load)",
+    "function ebsWhenReady(selector, fn, timeoutMs) {",
+    "  if ($(selector).length) { fn(); return; }",
+    "  var obs = new MutationObserver(function () {",
+    "    if ($(selector).length) { obs.disconnect(); fn(); }",
+    "  });",
+    "  obs.observe(document.body, { childList: true, subtree: true });",
+    "  setTimeout(function () { obs.disconnect(); }, timeoutMs || 15000);",
+    "}"
+  ];
+  var HELP_JS = [
+    "// ---- EBS field helpers (paste once per screen, no jQuery) ----",
+    "function ebsTail(dl, row, field) { return 'DataLinks[' + dl + '].Data[' + row + '].Items[' + field + ']'; }",
+    "function ebsInput(field, dl, row) {",
+    "  return document.querySelector('[name$=\"' + ebsTail(dl || 'DL', row || 0, field) + '.Value\"]:not([type=\"hidden\"])');",
+    "}",
+    "function ebsDisplay(field) { return document.querySelector('[id*=\"_Items_' + field + '__Value_\"][id$=\"_DISP\"]'); }",
+    "function ebsGet(field, dl, row) {",
+    "  var i = ebsInput(field, dl, row);",
+    "  if (i) return i.value.trim();",
+    "  var d = ebsDisplay(field); return d ? d.textContent.trim() : '';",
+    "}",
+    "function ebsSet(field, value, dl, row) {",
+    "  var i = ebsInput(field, dl, row); if (!i) return false;",
+    "  i.value = value;",
+    "  i.dispatchEvent(new Event('input', { bubbles: true }));",
+    "  i.dispatchEvent(new Event('change', { bubbles: true }));",
+    "  return true;",
+    "}",
+    "function ebsWhenReady(selector, fn, timeoutMs) {",
+    "  if (document.querySelector(selector)) { fn(); return; }",
+    "  var obs = new MutationObserver(function () {",
+    "    if (document.querySelector(selector)) { obs.disconnect(); fn(); }",
+    "  });",
+    "  obs.observe(document.body, { childList: true, subtree: true });",
+    "  setTimeout(function () { obs.disconnect(); }, timeoutMs || 15000);",
+    "}"
+  ];
+
+  function code() {
+    var c = cfg(), f = c.fields[0] || "FIELD", f2 = c.fields[1] || "OTHER_FIELD", dl = q(c.dl), row = c.row, V = c.vanilla;
+    var s = selectors(c, f), notes = {
+      helpers: "Defines ebsInput, ebsDisplay, ebsGet, ebsSet and ebsWhenReady. The other snippets use these.",
+      get: "Reads each field whether it's an editable input or locked as read-only text.",
+      set: "Sets the value and fires real input and change events so EBS treats it as edited. Does nothing if the field is read-only.",
+      ready: "Screens build their inputs after the page loads, so wait for the field before touching it.",
+      ajax: "Grids and panels redraw after ajax calls and lose your changes; this re-applies them after each call.",
+      "default": "Fills in the value only when the field is blank, e.g. a default employment status for 16-18 full-time learners. Add your own condition.",
+      toggle: "Shows or hides the second field based on the first field's value. Adjust the wrapper (.closest) to match the screen's layout.",
+      grid: "Colours grid cells by their text, and re-applies whenever the grid redraws. Set the grid selector and the column index."
+    };
+    $("snipNote").textContent = notes[snip];
+    var L = [];
+    if (snip === "helpers") return (V ? HELP_JS : HELP_JQ).join("\n").replace(/'DL'/g, dl);
+    var ready = '[name$="DataLinks[' + c.dl + '].Data[' + row + '].Items[' + f + '].Value"], ' + s.disp;
+    if (snip === "get") {
+      c.fields.forEach(function (x) { L.push("var " + x.toLowerCase().replace(/[^a-z0-9]+/g, "_") + " = ebsGet('" + x + "', " + dl + ", " + row + ");"); });
+      L.push("console.log(" + c.fields.map(function (x) { return x.toLowerCase().replace(/[^a-z0-9]+/g, "_"); }).join(", ") + ");");
+    } else if (snip === "set") {
+      L.push("ebsWhenReady('" + ready + "', function () {");
+      L.push("  ebsSet('" + f + "', " + q(c.val) + ", " + dl + ", " + row + ");");
+      L.push("});");
+    } else if (snip === "ready") {
+      L.push("ebsWhenReady('" + ready + "', function () {");
+      L.push("  // " + f + " is on the page now");
+      L.push("  var v = ebsGet('" + f + "', " + dl + ", " + row + ");");
+      L.push("  console.log('" + f + " =', v);");
+      L.push("});");
+    } else if (snip === "ajax") {
+      L.push("function applyTweaks() {");
+      L.push("  // your changes here, e.g.:");
+      L.push("  var v = ebsGet('" + f + "', " + dl + ", " + row + ");");
+      L.push("}");
+      if (V) {
+        L.push("// No jQuery: watch for redraws instead of ajax events");
+        L.push("var tweakTimer;");
+        L.push("new MutationObserver(function () { clearTimeout(tweakTimer); tweakTimer = setTimeout(applyTweaks, 100); })");
+        L.push("  .observe(document.body, { childList: true, subtree: true });");
+      } else {
+        L.push("$(document).ajaxComplete(function () { setTimeout(applyTweaks, 50); });");
+      }
+      L.push("applyTweaks();");
+    } else if (snip === "default") {
+      L.push("ebsWhenReady('" + ready + "', function () {");
+      L.push("  if (ebsGet('" + f + "', " + dl + ", " + row + ") === '') {");
+      L.push("    // add a condition here if the default only applies to some learners, e.g.");
+      L.push("    // var age = ...; if (age < 16 || age > 18) return;");
+      L.push("    ebsSet('" + f + "', " + q(c.val) + ", " + dl + ", " + row + ");");
+      L.push("  }");
+      L.push("});");
+    } else if (snip === "toggle") {
+      var t2 = selectors(c, f2);
+      L.push("function toggle" + f2.replace(/[^A-Za-z0-9]/g, "") + "() {");
+      L.push("  var show = ebsGet('" + f + "', " + dl + ", " + row + ") === " + q(c.val) + ";");
+      if (V) {
+        L.push("  var el = document.querySelector('" + t2.input + "') || document.querySelector('" + t2.disp + "');");
+        L.push("  var wrap = el && el.closest('.form-group, .control-group, tr');   // adjust to the screen's layout");
+        L.push("  if (wrap) wrap.style.display = show ? '' : 'none';");
+        L.push("}");
+        L.push("ebsWhenReady('" + ready + "', function () {");
+        L.push("  toggle" + f2.replace(/[^A-Za-z0-9]/g, "") + "();");
+        L.push("  var i = ebsInput('" + f + "', " + dl + ", " + row + "); if (i) i.addEventListener('change', toggle" + f2.replace(/[^A-Za-z0-9]/g, "") + ");");
+        L.push("});");
+      } else {
+        L.push("  var $el = $('" + t2.input + "').add('" + t2.disp + "');");
+        L.push("  $el.closest('.form-group, .control-group, tr').toggle(show);   // adjust to the screen's layout");
+        L.push("}");
+        L.push("ebsWhenReady('" + ready + "', function () {");
+        L.push("  toggle" + f2.replace(/[^A-Za-z0-9]/g, "") + "();");
+        L.push("  $(document).on('change', '" + s.input + "', toggle" + f2.replace(/[^A-Za-z0-9]/g, "") + ");");
+        L.push("});");
+      }
+    } else if (snip === "grid") {
+      var g = c.grid;
+      L.push("// Colour cells in column COL (0 = first) by their text");
+      L.push("var GRID = " + q(g) + ", COL = 0;");
+      L.push("var RULES = { 'Withdrawn': '#f8dcdc', 'At risk': '#faeeda', 'Complete': '#d8f3e3' };");
+      L.push("function styleGrid() {");
+      if (V) {
+        L.push("  document.querySelectorAll(GRID + ' tbody tr').forEach(function (tr) {");
+        L.push("    var td = tr.children[COL]; if (!td) return;");
+        L.push("    var colour = RULES[td.textContent.trim()];");
+        L.push("    td.style.backgroundColor = colour || '';");
+        L.push("  });");
+      } else {
+        L.push("  $(GRID).find('tbody tr').each(function () {");
+        L.push("    var $td = $(this).children().eq(COL);");
+        L.push("    var colour = RULES[$td.text().trim()];");
+        L.push("    $td.css('background-color', colour || '');");
+        L.push("  });");
+      }
+      L.push("}");
+      L.push("// Grids redraw on paging/sorting/ajax, so watch and re-apply");
+      L.push("var gridTimer;");
+      L.push("new MutationObserver(function () { clearTimeout(gridTimer); gridTimer = setTimeout(styleGrid, 50); })");
+      L.push("  .observe(document.body, { childList: true, subtree: true });");
+      L.push("styleGrid();");
+    }
+    return "// Needs the Helpers snippet on the same screen\n" + L.join("\n");
+  }
+
+  function render() { drawSelectors(); $("code").textContent = code(); }
+  document.querySelectorAll("#snips button").forEach(function (b) {
+    b.addEventListener("click", function () { snip = b.dataset.s; document.querySelectorAll("#snips button").forEach(function (x) { x.classList.toggle("on", x === b); }); render(); });
+  });
+  ["dl", "row", "fields", "val", "grid"].forEach(function (id) { $(id).addEventListener("input", render); });
+  $("vanilla").addEventListener("change", render);
+  $("copy").addEventListener("click", function () { var b = this; if (navigator.clipboard) navigator.clipboard.writeText($("code").textContent).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1200); }); });
+  render();
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>

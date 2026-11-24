@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flowchart Builder · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  main.wide { max-width: none; }
+  .fc-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0 10px; }
+  .fc-bar .sep { width: 1px; height: 26px; background: var(--border); margin: 0 4px; }
+  .fc-bar button, .fc-bar select { min-height: 0; padding: 5px 10px; font-size: 13px; }
+  .fc-bar .zoom { min-width: 48px; text-align: center; font-size: 13px; color: var(--muted); }
+  .fc-wrap { display: grid; grid-template-columns: 132px minmax(0, 1fr) 250px; gap: 10px; height: calc(100vh - 210px); min-height: 520px; }
+  .fc-pal, .fc-props { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); padding: 8px; overflow: auto; }
+  .fc-pal .ph { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 4px 2px 6px; }
+  .fc-pal .shape { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 4px; border: 1px solid transparent; border-radius: 6px; cursor: grab; font-size: 12px; user-select: none; }
+  .fc-pal .shape:hover { border-color: var(--border); background: var(--bg); }
+  .fc-pal .shape svg { display: block; }
+  .fc-canvas { position: relative; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); touch-action: none; }
+  .fc-canvas svg { display: block; width: 100%; height: 100%; user-select: none; }
+  .fc-canvas.panning { cursor: grabbing; }
+  .fc-edit { position: absolute; z-index: 5; outline: 2px solid var(--accent); background: var(--panel); color: var(--text); border-radius: 4px; padding: 4px 6px;
+    font-family: var(--ui); text-align: center; white-space: pre-wrap; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .fc-props h3 { font-size: 13px; margin: 2px 0 8px; }
+  .fc-props label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  .fc-props input[type=text], .fc-props input[type=number], .fc-props select, .fc-props textarea { width: 100%; box-sizing: border-box; font-size: 13px; }
+  .fc-props textarea { min-height: 60px; }
+  .fc-props .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fc-props .row button { min-height: 0; padding: 4px 8px; font-size: 12px; flex: 1 1 auto; }
+  .fc-props .sw { width: 24px; height: 24px; border-radius: 5px; border: 1px solid var(--border); cursor: pointer; padding: 0; min-height: 0; flex: none; }
+  .fc-props .sw.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .fc-props .hint { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .fc-props kbd { font-size: 11px; border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; background: var(--bg); }
+  dialog.fc-dlg { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); width: min(760px, 94vw); padding: 18px; }
+  dialog.fc-dlg::backdrop { background: rgba(10, 6, 25, .45); }
+  dialog.fc-dlg textarea { width: 100%; min-height: 280px; font-family: var(--mono); font-size: 13px; box-sizing: border-box; }
+  dialog.fc-dlg pre { font-size: 12px; }
+  @media (max-width: 980px) { .fc-wrap { grid-template-columns: minmax(0, 1fr); height: auto; } .fc-canvas { height: 70vh; } .fc-pal { display: flex; flex-wrap: wrap; gap: 4px; } }
+</style>
+</head>
+<body>
+<main class="wide">
+  <h1>Flowchart Builder</h1>
+  <p class="lead">Draw process maps and flowcharts with swimlanes, then export them as SVG, PDF or PNG. Diagrams are kept in this browser and can be saved as files to share.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li><strong>Add shapes:</strong> drag one from the left onto the page, or click it to drop it in the middle. Double-click empty space to add a process step there.</li>
+      <li><strong>Type:</strong> double-click a shape or arrow to edit its text. <kbd>Enter</kbd> finishes, <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line, <kbd>Esc</kbd> cancels.</li>
+      <li><strong>Connect:</strong> hover a shape and drag from one of its dots onto another shape. Drop on empty space to create and connect a new step in one go. Or select a shape and click a <strong>+</strong> to add the next step in that direction.</li>
+      <li><strong>Move around:</strong> drag empty space to pan, <kbd>Ctrl</kbd> + mouse wheel to zoom, <strong>Fit</strong> to see everything. <kbd>Shift</kbd>+drag on empty space selects several shapes; <kbd>Shift</kbd>+click adds to the selection.</li>
+      <li><strong>Swimlanes:</strong> click <strong>Add lane</strong> (with nothing selected). Double-click a lane's name to rename it; drag its bottom edge to resize.</li>
+      <li><strong>From text</strong> builds a whole chart from a list of steps (see the help inside). <strong>Tidy</strong> lays out the current chart neatly.</li>
+      <li>Shortcuts: <kbd>Delete</kbd> remove, <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo, <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd>/<kbd>D</kbd> copy/paste/duplicate, arrow keys nudge, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all.</li>
+      <li>Your diagrams save automatically in this browser. Use <strong>Save file</strong> to keep a copy or send it to someone; they open it with <strong>Open file</strong>.</li>
+    </ol>
+  </details>
+
+  <div class="fc-bar">
+    <select id="docSel" title="Your diagrams in this browser"></select>
+    <button id="newBtn">New</button>
+    <button id="openBtn">Open file</button>
+    <button id="saveBtn">Save file</button>
+    <input type="file" id="openFile" accept=".json,.flow,application/json" hidden>
+    <span class="sep"></span>
+    <button id="textBtn">From text</button>
+    <button id="tidyBtn">Tidy</button>
+    <span class="sep"></span>
+    <button id="undoBtn" title="Ctrl+Z">Undo</button>
+    <button id="redoBtn" title="Ctrl+Y">Redo</button>
+    <span class="sep"></span>
+    <button id="zOut" title="Zoom out">−</button><span class="zoom" id="zLbl">100%</span><button id="zIn" title="Zoom in">+</button>
+    <button id="fitBtn">Fit</button>
+    <span class="sep"></span>
+    <button id="exSvg">SVG</button>
+    <button id="exPdf">PDF</button>
+    <button id="exPng">PNG</button>
+    <button id="exMmd" title="Copy as Mermaid text">Mermaid</button>
+  </div>
+
+  <div class="fc-wrap">
+    <div class="fc-pal" id="pal"><div class="ph">Shapes</div></div>
+    <div class="fc-canvas" id="cv">
+      <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="var(--border)"/></pattern>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+          <marker id="arrS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+        </defs>
+        <rect id="gridBg" class="noexport" x="0" y="0" width="100%" height="100%" fill="url(#grid)"/>
+        <g id="world"><g id="gLanes"></g><g id="gEdges"></g><g id="gNodes"></g><g id="gUi"></g></g>
+      </svg>
+    </div>
+    <div class="fc-props" id="props"></div>
+  </div>
+
+  <dialog class="fc-dlg" id="textDlg">
+    <h2 style="margin-top:0">Build from text</h2>
+    <p class="meta" style="margin-top:0">One step per line. Indent the branches under a question. This replaces the current diagram (Undo brings it back).</p>
+    <textarea id="textIn" spellcheck="false"></textarea>
+    <details><summary>How to write it</summary>
+<pre>(Start)                      brackets = start/end
+Check fees paid?             ending with ? = decision
+  Yes: Enrol learner         indented lines are branches; "Yes:" labels the arrow
+  No: Send reminder -> Check fees paid?    -> jumps to a step by name
+[[Run enrolment workflow]]   double square brackets = sub-process
+/Learner details/            slashes = input/output
+{Enrolment form}             curly brackets = document
+((A))                        double round brackets = connector circle
+## Admissions                ## starts a swimlane; following steps go in it
+// note                      lines starting // are ignored</pre>
+    </details>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button id="textCancel">Cancel</button>
+      <button id="textGo" class="primary">Build diagram</button>
+    </div>
+  </dialog>
+</main>
+
+<script src="../../assets/export.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var STORE = "bitk.flow.v1", GRID = 10;
+  var TYPES = {
+    terminator: { label: "Start / End", w: 140, h: 48, fill: "#c8bfff" },
+    process:    { label: "Process", w: 150, h: 60, fill: "" },
+    decision:   { label: "Decision", w: 150, h: 84, fill: "#fff1cf" },
+    io:         { label: "Input / Output", w: 160, h: 60, fill: "" },
+    document:   { label: "Document", w: 150, h: 66, fill: "" },
+    subprocess: { label: "Sub-process", w: 160, h: 60, fill: "" },
+    database:   { label: "Database", w: 120, h: 76, fill: "" },
+    note:       { label: "Note", w: 170, h: 64, fill: "#fffbe6" },
+    circle:     { label: "Connector", w: 44, h: 44, fill: "" }
+  };
+  var FILLS = ["", "#ede9ff", "#c8bfff", "#d8f0e1", "#fff1cf", "#fbdcdc", "#dbe8fb", "#eeeeee"];
+  var svg = $("svg"), world = $("world"), cv = $("cv");
+
+  // ---------- state ----------
+  var store = { cur: null, docs: {} }, doc, sel = [], selEdge = null, selLane = null, hover = null;
+  var view = { tx: 60, ty: 40, z: 1 }, undo = [], redo = [], clip = null;
+  function blank(name) { return { name: name || "Untitled flowchart", nodes: [], edges: [], lanes: [], dir: "TB" }; }
+  function uid(p) { var n = 1, used = {}; doc.nodes.concat(doc.edges, doc.lanes).forEach(function (o) { used[o.id] = 1; }); while (used[p + n]) n++; return p + n; }
+  function node(id) { for (var i = 0; i < doc.nodes.length; i++) if (doc.nodes[i].id === id) return doc.nodes[i]; return null; }
+  function snap(v) { return Math.round(v / GRID) * GRID; }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function load() {
+    try { var s = JSON.parse(localStorage.getItem(STORE) || "null"); if (s && s.docs) store = s; } catch (e) {}
+    if (!store.cur || !store.docs[store.cur]) {
+      var ids = Object.keys(store.docs);
+      if (ids.length) store.cur = ids[0];
+      else { store.cur = "d" + Date.now(); store.docs[store.cur] = { updated: Date.now(), doc: sample() }; }
+    }
+    doc = store.docs[store.cur].doc;
+  }
+  var saveT;
+  function persist() {
+    clearTimeout(saveT);
+    saveT = setTimeout(function () {
+      store.docs[store.cur] = { updated: Date.now(), doc: doc };
+      try { localStorage.setItem(STORE, JSON.stringify(store)); } catch (e) {}
+      fillDocs();
+    }, 300);
+  }
+  function change() { redo = []; undo.push(JSON.stringify(doc)); if (undo.length > 150) undo.shift(); }
+  function undoIt() { if (!undo.length) return; redo.push(JSON.stringify(doc)); doc = JSON.parse(undo.pop()); store.docs[store.cur].doc = doc; clearSel(); render(); persist(); }
+  function redoIt() { if (!redo.length) return; undo.push(JSON.stringify(doc)); doc = JSON.parse(redo.pop()); store.docs[store.cur].doc = doc; clearSel(); render(); persist(); }
+  function clearSel() { sel = []; selEdge = null; selLane = null; }
+
+  // ---------- text measuring and wrapping ----------
+  var mctx = document.createElement("canvas").getContext("2d"), FONT = 13, LH = 16;
+  function uiFont() { return getComputedStyle(document.body).fontFamily || "sans-serif"; }
+  var fontFam = uiFont();
+  function tw(s, size) { mctx.font = (size || FONT) + "px " + fontFam; return mctx.measureText(s).width; }
+  function wrap(text, max) {
+    var out = [];
+    String(text || "").split("\n").forEach(function (para) {
+      var words = para.split(/\s+/).filter(Boolean), line = "";
+      if (!words.length) { out.push(""); return; }
+      words.forEach(function (w) {
+        var t = line ? line + " " + w : w;
+        if (tw(t) <= max || !line) line = t; else { out.push(line); line = w; }
+        while (tw(line) > max && line.length > 3) { var cut = line.length - 1; while (cut > 1 && tw(line.slice(0, cut)) > max) cut--; out.push(line.slice(0, cut)); line = line.slice(cut); }
+      });
+      out.push(line);
+    });
+    return out;
+  }
+  function textW(n) { var w = n.w; return n.type === "decision" ? w * 0.62 : n.type === "io" ? w - 40 : n.type === "circle" ? w - 6 : w - 18; }
+  function geom(n) { // effective height (grows to fit the text)
+    var lines = wrap(n.text, textW(n)), need = lines.length * LH + (n.type === "decision" ? 34 : n.type === "document" ? 26 : 18);
+    return { lines: lines, h: Math.max(n.h, n.type === "circle" ? n.h : need) };
+  }
+
+  // ---------- geometry ----------
+  function box(n) { var g = geom(n); return { x: n.x, y: n.y, w: n.w, h: g.h, cx: n.x + n.w / 2, cy: n.y + g.h / 2 }; }
+  function sidePt(n, side) {
+    var b = box(n);
+    if (side === "top") return { x: b.cx, y: b.y };
+    if (side === "bottom") return { x: b.cx, y: b.y + b.h - (n.type === "document" ? 6 : 0) };
+    if (side === "left") return { x: b.x + (n.type === "io" ? 9 : 0), y: b.cy };
+    return { x: b.x + b.w - (n.type === "io" ? 9 : 0), y: b.cy };
+  }
+  var DIRV = { top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0] };
+  function autoSides(a, b) {
+    var A = box(a), B = box(b), dx = B.cx - A.cx, dy = B.cy - A.cy;
+    if (dy < -10 && Math.abs(dx) < Math.max(A.w, B.w) * 0.6) return ["right", "right"]; // loop back up
+    var lr = doc.dir === "LR" || doc.lanes.length > 0;
+    if (lr && dx < -10 && Math.abs(dy) < Math.max(A.h, B.h) * 0.6) return ["bottom", "bottom"];
+    if (lr && dx > 10) {
+      if (Math.abs(dy) > Math.max(A.h, B.h) * 0.8) return ["right", dy < 0 ? "bottom" : "top"];
+      if (doc.nodes.some(function (n) { if (n === a || n === b) return false; var c = box(n); return c.cx > A.cx && c.cx < B.cx && Math.abs(c.cy - B.cy) < c.h / 2 + 4; })) return ["bottom", "bottom"];
+      return ["right", "left"];
+    }
+    if (Math.abs(dy) >= Math.abs(dx) * 0.6) return dy >= 0 ? ["bottom", "top"] : ["top", "bottom"];
+    return dx >= 0 ? ["right", "left"] : ["left", "right"];
+  }
+  // Spread a decision's branches over different sides so Yes/No don't overlap.
+  function decisionSide(a, e, b) {
+    var outs = doc.edges.filter(function (x) { return x.from === a.id && node(x.to); });
+    if (outs.length < 2) return null;
+    var A = box(a), lr = doc.dir === "LR" || doc.lanes.length > 0;
+    var info = outs.map(function (x) { var B = box(node(x.to)); return { e: x, dx: B.cx - A.cx, dy: B.cy - A.cy, B: B }; });
+    function k(p) { return lr ? Math.abs(p.dy) * 2 + Math.abs(p.dx) : Math.abs(p.dx) * 2 + Math.abs(p.dy); }
+    var main = info.slice().sort(function (p, q) { return k(p) - k(q); })[0];
+    var me = info.filter(function (x) { return x.e === e; })[0];
+    if (lr) {
+      if (me.dx < -10) return null; // going back: normal routing
+      if (me === main) return autoSides(a, b);
+      var fs2 = me.dy < 0 ? "top" : "bottom";
+      if (Math.abs(me.dy) < A.h) return [fs2, fs2]; // same row: loop round underneath (or over)
+      return [fs2, me.dx > A.w / 2 ? "left" : (me.dy < 0 ? "bottom" : "top")];
+    }
+    if (me.dy < -10) return null;
+    if (me === main) return ["bottom", "top"];
+    var side = me.dx < 0 ? "left" : "right";
+    if (info.filter(function (x) { return x !== main && (x.dx < 0 ? "left" : "right") === side; })[0] !== me) side = side === "left" ? "right" : "left";
+    return [side, me.dy > A.h / 2 ? "top" : (side === "left" ? "right" : "left")];
+  }
+  function route(e) {
+    var a = node(e.from), b = node(e.to); if (!a || !b) return null;
+    var au = autoSides(a, b);
+    if (a.type === "decision" && !e.fs) { var ds = decisionSide(a, e, b); if (ds) au = ds; }
+    var fs = e.fs || au[0], ts = e.ts || au[1];
+    var p1 = sidePt(a, fs), p2 = sidePt(b, ts), S = 18;
+    var d1 = DIRV[fs], d2 = DIRV[ts];
+    var q1 = { x: p1.x + d1[0] * S, y: p1.y + d1[1] * S }, q2 = { x: p2.x + d2[0] * S, y: p2.y + d2[1] * S };
+    var h1 = d1[0] !== 0, h2 = d2[0] !== 0, pts = [p1, q1];
+    if (h1 && h2) {
+      var mx = fs === ts ? (fs === "right" ? Math.max(q1.x, q2.x) : Math.min(q1.x, q2.x)) : (q1.x + q2.x) / 2;
+      pts.push({ x: mx, y: q1.y }, { x: mx, y: q2.y });
+    } else if (!h1 && !h2) {
+      var my = fs === ts ? (fs === "bottom" ? Math.max(q1.y, q2.y) : Math.min(q1.y, q2.y)) : (q1.y + q2.y) / 2;
+      pts.push({ x: q1.x, y: my }, { x: q2.x, y: my });
+    } else if (h1) pts.push({ x: q2.x, y: q1.y });
+    else pts.push({ x: q1.x, y: q2.y });
+    pts.push(q2, p2);
+    // drop repeated / straight-through points
+    var clean = [pts[0]];
+    for (var i = 1; i < pts.length; i++) {
+      var p = pts[i], l = clean[clean.length - 1];
+      if (Math.abs(p.x - l.x) < .5 && Math.abs(p.y - l.y) < .5) continue;
+      if (clean.length >= 2) { var ll = clean[clean.length - 2]; if ((Math.abs(ll.x - l.x) < .5 && Math.abs(l.x - p.x) < .5) || (Math.abs(ll.y - l.y) < .5 && Math.abs(l.y - p.y) < .5)) { clean[clean.length - 1] = p; continue; } }
+      clean.push(p);
+    }
+    // label spot: middle of the longest segment
+    var best = 0, mid = clean[0];
+    for (i = 1; i < clean.length; i++) { var L = Math.abs(clean[i].x - clean[i - 1].x) + Math.abs(clean[i].y - clean[i - 1].y); if (L > best) { best = L; mid = { x: (clean[i].x + clean[i - 1].x) / 2, y: (clean[i].y + clean[i - 1].y) / 2 }; } }
+    return { pts: clean, mid: mid };
+  }
+
+  // ---------- shapes ----------
+  function shape(n, b, fill, stroke, sw, extra) {
+    var x = b.x, y = b.y, w = b.w, h = b.h, a = ' fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"' + (extra || "");
+    switch (n.type) {
+      case "terminator": return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + Math.min(h / 2, w / 2) + '"' + a + '/>';
+      case "decision": return '<polygon points="' + [x + w / 2, y, x + w, y + h / 2, x + w / 2, y + h, x, y + h / 2].join(",") + '"' + a + '/>';
+      case "io": var s = Math.min(18, w / 6); return '<polygon points="' + [x + s, y, x + w, y, x + w - s, y + h, x, y + h].join(",") + '"' + a + '/>';
+      case "document": return '<path d="M' + x + ',' + y + ' H' + (x + w) + ' V' + (y + h - 10) + ' C' + (x + w * .75) + ',' + (y + h - 24) + ' ' + (x + w * .25) + ',' + (y + h + 4) + ' ' + x + ',' + (y + h - 10) + ' Z"' + a + '/>';
+      case "subprocess": return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3"' + a + '/><path d="M' + (x + 11) + ',' + y + ' V' + (y + h) + ' M' + (x + w - 11) + ',' + y + ' V' + (y + h) + '" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+      case "database": var r = Math.min(10, h / 5);
+        return '<path d="M' + x + ',' + (y + r) + ' A' + (w / 2) + ',' + r + ' 0 0 1 ' + (x + w) + ',' + (y + r) + ' V' + (y + h - r) + ' A' + (w / 2) + ',' + r + ' 0 0 1 ' + x + ',' + (y + h - r) + ' Z"' + a + '/>' +
+          '<path d="M' + x + ',' + (y + r) + ' A' + (w / 2) + ',' + r + ' 0 0 0 ' + (x + w) + ',' + (y + r) + '" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+      case "note": return '<path d="M' + x + ',' + y + ' H' + (x + w - 14) + ' L' + (x + w) + ',' + (y + 14) + ' V' + (y + h) + ' H' + x + ' Z"' + a + '/><path d="M' + (x + w - 14) + ',' + y + ' V' + (y + 14) + ' H' + (x + w) + '" fill="none" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+      case "circle": return '<circle cx="' + (x + w / 2) + '" cy="' + (y + h / 2) + '" r="' + Math.min(w, h) / 2 + '"' + a + '/>';
+      default: return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4"' + a + '/>';
+    }
+  }
+  function nodeSVG(n, ui) {
+    var g = geom(n), b = { x: n.x, y: n.y, w: n.w, h: g.h };
+    var fill = n.fill || "var(--panel)", tc = n.fill ? "#1d1830" : "var(--text)";
+    var stroke = n.type === "note" ? "var(--muted)" : "var(--accent-2)";
+    var on = ui && sel.indexOf(n.id) >= 0;
+    var o = '<g data-node="' + n.id + '">' + shape(n, b, fill, on ? "var(--accent)" : stroke, on ? 2.5 : 1.5, n.type === "note" ? ' stroke-dasharray="4,3"' : "");
+    var y0 = b.y + b.h / 2 - (g.lines.length - 1) * LH / 2 - (n.type === "document" ? 4 : 0);
+    o += '<text x="' + (b.x + b.w / 2) + '" y="' + y0 + '" text-anchor="middle" dominant-baseline="central" font-size="' + FONT + '" fill="' + tc + '" font-family="var(--ui)"' + (n.bold ? ' font-weight="700"' : "") + '>';
+    g.lines.forEach(function (l, i) { o += '<tspan x="' + (b.x + b.w / 2) + '" dy="' + (i ? LH : 0) + '">' + esc(l) + '</tspan>'; });
+    return o + '</text></g>';
+  }
+  function edgeSVG(e, ui) {
+    var r = route(e); if (!r) return "";
+    var on = ui && selEdge === e.id, d = "M" + r.pts.map(function (p) { return p.x + "," + p.y; }).join(" L");
+    var col = on ? "var(--accent)" : "var(--muted)", mk = on ? "url(#arrS)" : "url(#arr)";
+    var o = '<g data-edge="' + e.id + '">';
+    if (ui) o += '<path d="' + d + '" fill="none" stroke="transparent" stroke-width="12" class="noexport"/>';
+    o += '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' + (on ? 2.2 : 1.6) + '"' + (e.dash ? ' stroke-dasharray="6,4"' : "") +
+      (e.arrow === "none" ? "" : ' marker-end="' + mk + '"') + (e.arrow === "both" ? ' marker-start="' + mk + '"' : "") + ' stroke-linejoin="round"/>';
+    if (e.label) {
+      var lw = tw(e.label, 12) + 10;
+      o += '<rect x="' + (r.mid.x - lw / 2) + '" y="' + (r.mid.y - 9) + '" width="' + lw + '" height="18" rx="4" fill="var(--bg)" stroke="var(--border)"/>' +
+        '<text x="' + r.mid.x + '" y="' + r.mid.y + '" text-anchor="middle" dominant-baseline="central" font-size="12" fill="var(--text)" font-family="var(--ui)">' + esc(e.label) + '</text>';
+    }
+    return o + '</g>';
+  }
+  function bounds(withLanes) {
+    var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    doc.nodes.forEach(function (n) { var b = box(n); x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y); x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h); });
+    doc.edges.forEach(function (e) { var r = route(e); if (r) r.pts.forEach(function (p) { x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y); x2 = Math.max(x2, p.x); y2 = Math.max(y2, p.y); }); });
+    if (withLanes && doc.lanes.length) { var L = laneGeom(); x1 = Math.min(x1, L.x); y1 = Math.min(y1, 0); x2 = Math.max(x2, L.x + L.w); y2 = Math.max(y2, L.h); }
+    if (x1 === Infinity) return { x: 0, y: 0, w: 400, h: 300 };
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  }
+  function laneGeom() {
+    var b = { x: Infinity, x2: -Infinity };
+    doc.nodes.forEach(function (n) { b.x = Math.min(b.x, n.x); b.x2 = Math.max(b.x2, n.x + n.w); });
+    if (b.x === Infinity) { b.x = 60; b.x2 = 900; }
+    var x = Math.min(0, b.x - 60), w = Math.max(900, b.x2 + 60 - x), y = 0, out = [];
+    doc.lanes.forEach(function (l) { out.push({ l: l, y: y, h: l.h }); y += l.h; });
+    return { x: x, w: w, h: y, lanes: out };
+  }
+  function lanesSVG(ui) {
+    if (!doc.lanes.length) return "";
+    var L = laneGeom(), o = "";
+    L.lanes.forEach(function (r, i) {
+      var on = ui && selLane === r.l.id;
+      o += '<g data-lane="' + r.l.id + '"><rect x="' + L.x + '" y="' + r.y + '" width="' + L.w + '" height="' + r.h + '" fill="' + (i % 2 ? "var(--bg)" : "var(--panel)") + '" stroke="var(--border)"/>' +
+        '<rect data-lanehead="' + r.l.id + '" x="' + L.x + '" y="' + r.y + '" width="34" height="' + r.h + '" fill="' + (on ? "var(--accent)" : "var(--tint)") + '" stroke="var(--border)"/>' +
+        '<text data-lanehead="' + r.l.id + '" transform="translate(' + (L.x + 17) + ',' + (r.y + r.h / 2) + ') rotate(-90)" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="700" fill="' + (on ? "var(--accent-text)" : "var(--tint-text)") + '" font-family="var(--ui)">' + esc(r.l.name) + '</text>';
+      if (ui) o += '<rect data-laneedge="' + r.l.id + '" class="noexport" x="' + L.x + '" y="' + (r.y + r.h - 4) + '" width="' + L.w + '" height="8" fill="transparent" style="cursor:ns-resize"/>';
+      o += '</g>';
+    });
+    return o;
+  }
+  function uiSVG() {
+    var o = "";
+    var show = {}; if (hover) show[hover] = 1; if (sel.length === 1) show[sel[0]] = 1;
+    Object.keys(show).forEach(function (id) {
+      var n = node(id); if (!n) return;
+      ["top", "right", "bottom", "left"].forEach(function (s) { var p = sidePt(n, s); o += '<circle data-h="' + id + '" data-side="' + s + '" cx="' + p.x + '" cy="' + p.y + '" r="5" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5" style="cursor:crosshair"/>'; });
+    });
+    if (sel.length === 1 && node(sel[0])) {
+      var n = node(sel[0]), b = box(n);
+      ["top", "right", "bottom", "left"].forEach(function (s) {
+        var p = sidePt(n, s), d = DIRV[s], x = p.x + d[0] * 26, y = p.y + d[1] * 26;
+        o += '<g data-plus="' + s + '" style="cursor:pointer"><circle cx="' + x + '" cy="' + y + '" r="8" fill="var(--accent)" opacity=".85"/><path d="M' + (x - 4) + ',' + y + ' H' + (x + 4) + ' M' + x + ',' + (y - 4) + ' V' + (y + 4) + '" stroke="var(--accent-text)" stroke-width="2"/></g>';
+      });
+      o += '<rect data-rs="' + n.id + '" x="' + (b.x + b.w - 5) + '" y="' + (b.y + b.h - 5) + '" width="10" height="10" fill="var(--accent)" style="cursor:nwse-resize"/>';
+    }
+    if (drag && drag.mode === "marquee") { var m = drag.rect; o += '<rect x="' + m.x + '" y="' + m.y + '" width="' + m.w + '" height="' + m.h + '" fill="var(--tint)" fill-opacity=".35" stroke="var(--accent)" stroke-dasharray="4,3"/>'; }
+    if (drag && drag.mode === "connect" && drag.to) { var p0 = sidePt(node(drag.from), drag.side); o += '<path d="M' + p0.x + ',' + p0.y + ' L' + drag.to.x + ',' + drag.to.y + '" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrS)"/>'; }
+    return o;
+  }
+
+  // ---------- render ----------
+  function render() {
+    world.setAttribute("transform", "translate(" + view.tx + "," + view.ty + ") scale(" + view.z + ")");
+    $("gLanes").innerHTML = lanesSVG(true);
+    $("gEdges").innerHTML = doc.edges.map(function (e) { return edgeSVG(e, true); }).join("");
+    $("gNodes").innerHTML = doc.nodes.map(function (n) { return nodeSVG(n, true); }).join("");
+    renderUi();
+    $("zLbl").textContent = Math.round(view.z * 100) + "%";
+    var g = $("grid"); g.setAttribute("x", view.tx); g.setAttribute("y", view.ty); g.setAttribute("width", 20 * view.z); g.setAttribute("height", 20 * view.z);
+    g.firstElementChild.setAttribute("r", Math.max(.6, view.z));
+    $("undoBtn").disabled = !undo.length; $("redoBtn").disabled = !redo.length;
+    props();
+  }
+  function renderUi() { $("gUi").innerHTML = uiSVG(); }
+
+  function exportSVG() {
+    var B = bounds(true), pad = 24, host = document.createElement("div");
+    host.style.cssText = "position:absolute;left:-100000px;top:0;";
+    host.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + (B.x - pad) + " " + (B.y - pad) + " " + (B.w + 2 * pad) + " " + (B.h + 2 * pad) + '" font-family="var(--ui)">' +
+      svg.querySelector("defs").outerHTML.replace(/id="(grid|arr|arrS)"/g, 'id="x$1"').replace(/<pattern[\s\S]*?<\/pattern>/, "") +
+      lanesSVG(false) + doc.edges.map(function (e) { return edgeSVG(e, false); }).join("").replace(/url\(#arr\)/g, "url(#xarr)") + doc.nodes.map(function (n) { return nodeSVG(n, false); }).join("") + "</svg>";
+    document.body.appendChild(host);
+    return { el: host.firstChild, done: function () { host.remove(); } };
+  }
+  function doExport(kind) {
+    if (!doc.nodes.length) { alert("The diagram is empty."); return; }
+    var x = exportSVG();
+    try { BITK_EXPORT[kind](x.el, doc.name || "Flowchart"); } finally { setTimeout(x.done, 50); }
+  }
+
+  // ---------- coordinates ----------
+  function toWorld(ev) { var r = svg.getBoundingClientRect(); return { x: (ev.clientX - r.left - view.tx) / view.z, y: (ev.clientY - r.top - view.ty) / view.z }; }
+  function nodeAt(p, except) {
+    for (var i = doc.nodes.length - 1; i >= 0; i--) { var n = doc.nodes[i], b = box(n); if (n.id !== except && p.x >= b.x - 4 && p.x <= b.x + b.w + 4 && p.y >= b.y - 4 && p.y <= b.y + b.h + 4) return n; }
+    return null;
+  }
+  function nearestSide(n, p) {
+    var best = "top", bd = Infinity;
+    ["top", "right", "bottom", "left"].forEach(function (s) { var q = sidePt(n, s), d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = s; } });
+    return best;
+  }
+  function viewCentre() { var r = svg.getBoundingClientRect(); return { x: (r.width / 2 - view.tx) / view.z, y: (r.height / 2 - view.ty) / view.z }; }
+
+  // ---------- editing ----------
+  function addNode(type, x, y, text) {
+    var t = TYPES[type] || TYPES.process;
+    var n = { id: uid("n"), type: type, x: snap(x - t.w / 2), y: snap(y - t.h / 2), w: t.w, h: t.h, text: text !== undefined ? text : (type === "terminator" ? (doc.nodes.some(function (o) { return o.type === "terminator"; }) ? "End" : "Start") : type === "decision" ? "Question?" : type === "circle" ? "A" : t.label), fill: t.fill };
+    doc.nodes.push(n); return n;
+  }
+  function addEdge(a, b, fs, ts, label) {
+    if (a === b) return null;
+    var e = { id: uid("e"), from: a, to: b, label: label || "" }; if (fs) e.fs = fs; if (ts) e.ts = ts;
+    doc.edges.push(e); return e;
+  }
+  function quickAdd(side) {
+    var src = node(sel[0]); if (!src) return;
+    change();
+    var b = box(src), d = DIRV[side], type = src.type === "terminator" && doc.edges.some(function (e) { return e.to === src.id; }) ? "process" : (src.type === "decision" || src.type === "terminator" || src.type === "note" || src.type === "circle" ? "process" : src.type);
+    var t = TYPES[type], gap = 60;
+    var cx = b.cx + d[0] * (b.w / 2 + gap + t.w / 2), cy = b.cy + d[1] * (b.h / 2 + gap + t.h / 2);
+    var tries = 0; while (nodeAt({ x: cx, y: cy }) && tries++ < 8) { if (d[0]) cy += t.h + 30; else cx += t.w + 30; }
+    var n = addNode(type, cx, cy, "");
+    var opp = { top: "bottom", bottom: "top", left: "right", right: "left" };
+    var lbl = src.type === "decision" ? (doc.edges.filter(function (e) { return e.from === src.id; }).length ? "No" : "Yes") : "";
+    addEdge(src.id, n.id, side, opp[side], lbl);
+    sel = [n.id]; selEdge = null; render(); persist();
+    editNode(n);
+  }
+  function del() {
+    if (!sel.length && !selEdge && !selLane) return;
+    change();
+    if (selLane) { doc.lanes = doc.lanes.filter(function (l) { return l.id !== selLane; }); }
+    if (sel.length) { doc.nodes = doc.nodes.filter(function (n) { return sel.indexOf(n.id) < 0; }); doc.edges = doc.edges.filter(function (e) { return sel.indexOf(e.from) < 0 && sel.indexOf(e.to) < 0; }); }
+    if (selEdge) doc.edges = doc.edges.filter(function (e) { return e.id !== selEdge; });
+    clearSel(); render(); persist();
+  }
+  function copySel() {
+    if (!sel.length) return;
+    clip = { nodes: doc.nodes.filter(function (n) { return sel.indexOf(n.id) >= 0; }), edges: doc.edges.filter(function (e) { return sel.indexOf(e.from) >= 0 && sel.indexOf(e.to) >= 0; }) };
+    clip = JSON.parse(JSON.stringify(clip));
+  }
+  function paste(off) {
+    if (!clip || !clip.nodes.length) return;
+    change();
+    var map = {}, ids = [];
+    clip.nodes.forEach(function (n) { var c = JSON.parse(JSON.stringify(n)); c.id = uid("n"); map[n.id] = c.id; c.x += off; c.y += off; doc.nodes.push(c); ids.push(c.id); });
+    clip.edges.forEach(function (e) { var c = JSON.parse(JSON.stringify(e)); c.id = uid("e"); c.from = map[e.from]; c.to = map[e.to]; doc.edges.push(c); });
+    clip.nodes.forEach(function (n) { n.x += off; n.y += off; });
+    sel = ids; selEdge = null; render(); persist();
+  }
+
+  // Inline text editor
+  var editing = null;
+  function overlay(x, y, w, h, text, fs, done) {
+    closeEdit(true);
+    var r = svg.getBoundingClientRect(), cr = cv.getBoundingClientRect();
+    var d = document.createElement("div"); d.className = "fc-edit"; d.contentEditable = "true"; d.spellcheck = true;
+    d.style.left = (r.left - cr.left + view.tx + x * view.z) + "px"; d.style.top = (r.top - cr.top + view.ty + y * view.z) + "px";
+    d.style.width = Math.max(60, w * view.z) + "px"; d.style.minHeight = Math.max(24, h * view.z) + "px"; d.style.fontSize = (fs * view.z) + "px";
+    d.textContent = text; cv.appendChild(d);
+    editing = { el: d, done: done, orig: text };
+    d.focus(); var rg = document.createRange(); rg.selectNodeContents(d); var s = window.getSelection(); s.removeAllRanges(); s.addRange(rg);
+    d.addEventListener("keydown", function (ev) {
+      ev.stopPropagation();
+      if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); closeEdit(true); }
+      else if (ev.key === "Escape") { ev.preventDefault(); closeEdit(false); }
+    });
+    d.addEventListener("blur", function () { setTimeout(function () { if (editing && editing.el === d) closeEdit(true); }, 0); });
+  }
+  function closeEdit(keep) {
+    if (!editing) return;
+    var e = editing; editing = null;
+    var v = e.el.innerText.replace(/ /g, " ").replace(/\n+$/, "");
+    e.el.remove();
+    if (keep && v !== e.orig) e.done(v);
+  }
+  function editNode(n) {
+    var g = geom(n);
+    overlay(n.x, n.y, n.w, g.h, n.text, FONT, function (v) { change(); n.text = v; render(); persist(); });
+  }
+  function editEdge(e) {
+    var r = route(e); if (!r) return;
+    overlay(r.mid.x - 50, r.mid.y - 12, 100, 24, e.label || "", 12, function (v) { change(); e.label = v.trim(); render(); persist(); });
+  }
+  function editLane(l) {
+    var L = laneGeom(), row = L.lanes.filter(function (x) { return x.l === l; })[0];
+    overlay(L.x + 40, row.y + row.h / 2 - 14, 180, 28, l.name, 13, function (v) { change(); l.name = v.trim() || l.name; render(); persist(); });
+  }
+
+  // ---------- pointer handling ----------
+  var drag = null;
+  var lastDown = { t: 0, x: 0, y: 0 };
+  svg.addEventListener("pointerdown", function (ev) {
+    if (ev.button === 2) return;
+    if (document.activeElement && $("props").contains(document.activeElement)) document.activeElement.blur();
+    closeEdit(true);
+    var t = ev.target, p = toWorld(ev), g, now = Date.now();
+    if (now - lastDown.t < 420 && Math.abs(ev.clientX - lastDown.x) < 6 && Math.abs(ev.clientY - lastDown.y) < 6) { lastDown.t = 0; drag = null; dbl(ev); ev.preventDefault(); return; }
+    lastDown = { t: now, x: ev.clientX, y: ev.clientY };
+    if ((g = t.closest("[data-plus]"))) { ev.preventDefault(); lastDown.t = 0; quickAdd(g.getAttribute("data-plus")); drag = null; return; }
+    if ((g = t.closest("[data-h]"))) { drag = { mode: "connect", from: g.getAttribute("data-h"), side: g.getAttribute("data-side"), to: p }; return; }
+    if ((g = t.closest("[data-rs]"))) { var rn = node(g.getAttribute("data-rs")); drag = { mode: "resize", n: rn, w: rn.w, h: rn.h, p: p, snap: JSON.stringify(doc) }; return; }
+    if ((g = t.closest("[data-laneedge]"))) { var ln = doc.lanes.filter(function (l) { return l.id === g.getAttribute("data-laneedge"); })[0]; drag = { mode: "lane", l: ln, h: ln.h, p: p, snap: JSON.stringify(doc) }; return; }
+    if ((g = t.closest("[data-node]"))) {
+      var id = g.getAttribute("data-node");
+      if (ev.shiftKey) { var i = sel.indexOf(id); if (i >= 0) sel.splice(i, 1); else sel.push(id); }
+      else if (sel.indexOf(id) < 0) sel = [id];
+      selEdge = null; selLane = null;
+      drag = { mode: "move", p: p, start: sel.map(function (k) { var n = node(k); return { n: n, x: n.x, y: n.y }; }), snap: JSON.stringify(doc), moved: false };
+      render(); return;
+    }
+    if ((g = t.closest("[data-edge]"))) { sel = []; selLane = null; selEdge = g.getAttribute("data-edge"); drag = null; render(); return; }
+    if ((g = t.closest("[data-lanehead]"))) { sel = []; selEdge = null; selLane = g.getAttribute("data-lanehead"); drag = null; render(); return; }
+    if (ev.shiftKey) { drag = { mode: "marquee", p: p, rect: { x: p.x, y: p.y, w: 0, h: 0 }, base: sel.slice() }; return; }
+    drag = { mode: "pan", sx: ev.clientX, sy: ev.clientY, tx: view.tx, ty: view.ty, moved: false };
+    cv.classList.add("panning");
+  });
+  window.addEventListener("pointermove", function (ev) {
+    var p = toWorld(ev);
+    if (!drag) {
+      if (!svg.contains(ev.target)) { if (hover) { hover = null; renderUi(); } return; }
+      var g = ev.target.closest && ev.target.closest("[data-node],[data-h]"), h = g ? (g.getAttribute("data-node") || g.getAttribute("data-h")) : null;
+      if (!h) { var near = nodeAt(p); h = near ? near.id : null; }
+      if (h !== hover) { hover = h; renderUi(); }
+      return;
+    }
+    if (drag.mode === "pan") { view.tx = drag.tx + ev.clientX - drag.sx; view.ty = drag.ty + ev.clientY - drag.sy; if (Math.abs(ev.clientX - drag.sx) + Math.abs(ev.clientY - drag.sy) > 3) drag.moved = true; render(); return; }
+    if (drag.mode === "move") {
+      var dx = p.x - drag.p.x, dy = p.y - drag.p.y;
+      if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3 / view.z) return;
+      drag.moved = true;
+      drag.start.forEach(function (s) { s.n.x = snap(s.x + dx); s.n.y = snap(s.y + dy); });
+      render(); return;
+    }
+    if (drag.mode === "resize") { drag.n.w = Math.max(40, snap(drag.w + p.x - drag.p.x)); drag.n.h = Math.max(30, snap(drag.h + p.y - drag.p.y)); drag.moved = true; render(); return; }
+    if (drag.mode === "lane") { drag.l.h = Math.max(80, snap(drag.h + p.y - drag.p.y)); drag.moved = true; render(); return; }
+    if (drag.mode === "connect") { drag.to = p; renderUi(); return; }
+    if (drag.mode === "marquee") {
+      var r = drag.rect = { x: Math.min(p.x, drag.p.x), y: Math.min(p.y, drag.p.y), w: Math.abs(p.x - drag.p.x), h: Math.abs(p.y - drag.p.y) };
+      sel = drag.base.slice();
+      doc.nodes.forEach(function (n) { var b = box(n); if (b.x >= r.x && b.y >= r.y && b.x + b.w <= r.x + r.w && b.y + b.h <= r.y + r.h && sel.indexOf(n.id) < 0) sel.push(n.id); });
+      render();
+    }
+  });
+  window.addEventListener("pointerup", function (ev) {
+    cv.classList.remove("panning");
+    var d = drag; drag = null; if (!d) return;
+    if (d.moved || d.mode === "connect" || d.mode === "marquee") lastDown.t = 0;
+    var p = toWorld(ev);
+    if (d.mode === "pan" && !d.moved) { clearSel(); render(); return; }
+    if ((d.mode === "move" || d.mode === "resize" || d.mode === "lane") && d.moved) { redo = []; undo.push(d.snap); persist(); render(); return; }
+    if (d.mode === "connect") {
+      var src = node(d.from), tgt = nodeAt(p, d.from);
+      change();
+      if (!tgt) {
+        if (Math.hypot(p.x - sidePt(src, d.side).x, p.y - sidePt(src, d.side).y) < 20) { undo.pop(); render(); return; }
+        var t = TYPES.process, dv = DIRV[d.side];
+        tgt = addNode("process", p.x + dv[0] * t.w / 2, p.y + dv[1] * t.h / 2, "");
+        var e = addEdge(src.id, tgt.id, d.side, nearestSide(tgt, sidePt(src, d.side)), src.type === "decision" ? (doc.edges.some(function (x) { return x.from === src.id; }) ? "No" : "Yes") : "");
+        sel = [tgt.id]; render(); persist(); editNode(tgt); return;
+      }
+      var lbl = src.type === "decision" ? (doc.edges.some(function (x) { return x.from === src.id; }) ? "No" : "Yes") : "";
+      addEdge(src.id, tgt.id, d.side, nearestSide(tgt, p), lbl);
+      render(); persist(); return;
+    }
+    if (d.mode === "marquee") render();
+  });
+  function dbl(ev) {
+    var t = ev.target, g;
+    if ((g = t.closest("[data-node]"))) { editNode(node(g.getAttribute("data-node"))); return; }
+    if ((g = t.closest("[data-edge]"))) { editEdge(doc.edges.filter(function (e) { return e.id === g.getAttribute("data-edge"); })[0]); return; }
+    if ((g = t.closest("[data-lanehead]"))) { editLane(doc.lanes.filter(function (l) { return l.id === g.getAttribute("data-lanehead"); })[0]); return; }
+    var p = toWorld(ev); change(); var n = addNode("process", p.x, p.y, ""); sel = [n.id]; render(); persist(); editNode(n);
+  }
+  svg.addEventListener("wheel", function (ev) {
+    ev.preventDefault();
+    if (ev.ctrlKey || ev.metaKey) { var r = svg.getBoundingClientRect(); zoomAt(ev.clientX - r.left, ev.clientY - r.top, Math.exp(-ev.deltaY * 0.0022)); }
+    else { view.tx -= ev.deltaX; view.ty -= ev.deltaY; render(); }
+  }, { passive: false });
+  function zoomAt(sx, sy, f) {
+    var z = Math.min(3, Math.max(0.2, view.z * f)); f = z / view.z;
+    view.tx = sx - (sx - view.tx) * f; view.ty = sy - (sy - view.ty) * f; view.z = z; render();
+  }
+  function fit() {
+    var B = bounds(true), r = svg.getBoundingClientRect(); if (!r.width) return;
+    var z = Math.min(1.5, Math.max(0.2, Math.min((r.width - 60) / Math.max(B.w, 1), (r.height - 60) / Math.max(B.h, 1))));
+    view.z = z; view.tx = (r.width - B.w * z) / 2 - B.x * z; view.ty = (r.height - B.h * z) / 2 - B.y * z; render();
+  }
+
+  // ---------- drag from palette ----------
+  Object.keys(TYPES).forEach(function (k) {
+    var t = TYPES[k], d = document.createElement("div"); d.className = "shape"; d.draggable = true; d.title = "Drag onto the page, or click to add";
+    var demo = { type: k, x: 2, y: 2, w: k === "circle" ? 26 : 60, h: k === "circle" ? 26 : k === "decision" ? 36 : 28, text: "" };
+    d.innerHTML = '<svg width="64" height="40" viewBox="0 0 64 40">' + shape(demo, { x: 2, y: 2 + (36 - demo.h) / 2, w: demo.w, h: demo.h }, t.fill || "var(--panel)", "var(--accent-2)", 1.4) + "</svg><span>" + t.label + "</span>";
+    if (k === "circle") d.querySelector("svg").innerHTML = shape(demo, { x: 19, y: 7, w: 26, h: 26 }, "var(--panel)", "var(--accent-2)", 1.4);
+    d.addEventListener("dragstart", function (ev) { ev.dataTransfer.setData("text/x-fc", k); ev.dataTransfer.effectAllowed = "copy"; });
+    d.addEventListener("click", function () { change(); var c = viewCentre(), off = (doc.nodes.length % 6) * 20; var n = addNode(k, c.x + off, c.y + off); sel = [n.id]; selEdge = null; render(); persist(); });
+    $("pal").appendChild(d);
+  });
+  cv.addEventListener("dragover", function (ev) { if (ev.dataTransfer.types.indexOf("text/x-fc") >= 0) { ev.preventDefault(); ev.dataTransfer.dropEffect = "copy"; } });
+  cv.addEventListener("drop", function (ev) {
+    var k = ev.dataTransfer.getData("text/x-fc"); if (!k) return; ev.preventDefault();
+    change(); var p = toWorld(ev), n = addNode(k, p.x, p.y); sel = [n.id]; selEdge = null; render(); persist();
+  });
+
+  // ---------- keyboard ----------
+  document.addEventListener("keydown", function (ev) {
+    if (editing) return;
+    var tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (/INPUT|TEXTAREA|SELECT/.test(tag) || (document.activeElement && document.activeElement.isContentEditable)) return;
+    if ($("textDlg").open) return;
+    var ctrl = ev.ctrlKey || ev.metaKey, k = ev.key;
+    if (k === "Delete" || k === "Backspace") { if (sel.length || selEdge || selLane) { ev.preventDefault(); del(); } return; }
+    if (ctrl && k.toLowerCase() === "z") { ev.preventDefault(); if (ev.shiftKey) redoIt(); else undoIt(); return; }
+    if (ctrl && k.toLowerCase() === "y") { ev.preventDefault(); redoIt(); return; }
+    if (ctrl && k.toLowerCase() === "c") { copySel(); return; }
+    if (ctrl && k.toLowerCase() === "v") { ev.preventDefault(); paste(30); return; }
+    if (ctrl && k.toLowerCase() === "d") { ev.preventDefault(); copySel(); paste(30); return; }
+    if (ctrl && k.toLowerCase() === "a") { ev.preventDefault(); sel = doc.nodes.map(function (n) { return n.id; }); selEdge = null; render(); return; }
+    if (k === "Escape") { clearSel(); render(); return; }
+    if (k === "F2" || (k === "Enter" && sel.length === 1)) { ev.preventDefault(); if (sel.length === 1) editNode(node(sel[0])); else if (selEdge) editEdge(doc.edges.filter(function (e) { return e.id === selEdge; })[0]); return; }
+    var mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
+    if (mv && sel.length) { ev.preventDefault(); change(); var st = ev.shiftKey ? 1 : GRID; sel.forEach(function (id) { var n = node(id); n.x += mv[0] * st; n.y += mv[1] * st; }); render(); persist(); }
+  });
+
+  // ---------- properties panel ----------
+  function el(tag, attrs, text) { var e = document.createElement(tag); for (var k in attrs || {}) { if (k === "on") continue; e.setAttribute(k, attrs[k]); } if (text !== undefined) e.textContent = text; return e; }
+  function btn(label, fn, title) { var b = el("button", title ? { title: title } : {}, label); b.addEventListener("click", fn); return b; }
+  function lab(t) { return el("label", {}, t); }
+  function props() {
+    var P = $("props"); if (P.contains(document.activeElement) && document.activeElement.tagName !== "BUTTON") return; // don't rebuild while typing
+    P.innerHTML = "";
+    if (selLane) {
+      var l = doc.lanes.filter(function (x) { return x.id === selLane; })[0]; if (!l) { selLane = null; return props(); }
+      P.appendChild(el("h3", {}, "Swimlane"));
+      P.appendChild(lab("Name")); var ni = el("input", { type: "text" }); ni.value = l.name; P.appendChild(ni);
+      ni.addEventListener("change", function () { change(); l.name = ni.value.trim() || l.name; render(); persist(); });
+      P.appendChild(lab("Height")); var hi = el("input", { type: "number", min: 80, step: 10 }); hi.value = l.h; P.appendChild(hi);
+      hi.addEventListener("change", function () { change(); l.h = Math.max(80, +hi.value || l.h); render(); persist(); });
+      var r = el("div", { "class": "row" }); P.appendChild(lab("")); P.appendChild(r);
+      var idx = doc.lanes.indexOf(l);
+      r.appendChild(btn("Move up", function () { if (idx > 0) { change(); doc.lanes.splice(idx, 1); doc.lanes.splice(idx - 1, 0, l); render(); persist(); } }));
+      r.appendChild(btn("Move down", function () { if (idx < doc.lanes.length - 1) { change(); doc.lanes.splice(idx, 1); doc.lanes.splice(idx + 1, 0, l); render(); persist(); } }));
+      r.appendChild(btn("Delete lane", del));
+      P.appendChild(el("p", { "class": "hint" }, "Moving a lane doesn't move the shapes in it; use Tidy afterwards to rearrange."));
+      return;
+    }
+    if (selEdge) {
+      var e = doc.edges.filter(function (x) { return x.id === selEdge; })[0]; if (!e) { selEdge = null; return props(); }
+      P.appendChild(el("h3", {}, "Arrow"));
+      P.appendChild(lab("Label")); var li = el("input", { type: "text", placeholder: "e.g. Yes" }); li.value = e.label || ""; P.appendChild(li);
+      li.addEventListener("input", function () { if (!li._c) { change(); li._c = 1; } e.label = li.value; $("gEdges").innerHTML = doc.edges.map(function (x) { return edgeSVG(x, true); }).join(""); persist(); });
+      P.appendChild(lab("Line"));
+      var ls = el("select"); [["", "Solid"], ["1", "Dashed"]].forEach(function (o) { var op = el("option", { value: o[0] }, o[1]); if ((e.dash ? "1" : "") === o[0]) op.selected = true; ls.appendChild(op); }); P.appendChild(ls);
+      ls.addEventListener("change", function () { change(); e.dash = !!ls.value; render(); persist(); });
+      P.appendChild(lab("Arrow head"));
+      var as = el("select"); [["", "End"], ["both", "Both ends"], ["none", "None"]].forEach(function (o) { var op = el("option", { value: o[0] }, o[1]); if ((e.arrow || "") === o[0]) op.selected = true; as.appendChild(op); }); P.appendChild(as);
+      as.addEventListener("change", function () { change(); e.arrow = as.value || undefined; render(); persist(); });
+      var r2 = el("div", { "class": "row" }); P.appendChild(lab("")); P.appendChild(r2);
+      r2.appendChild(btn("Reverse", function () { change(); var t = e.from; e.from = e.to; e.to = t; var s = e.fs; e.fs = e.ts; e.ts = s; render(); persist(); }));
+      r2.appendChild(btn("Auto route", function () { change(); delete e.fs; delete e.ts; render(); persist(); }, "Let the arrow pick the best sides"));
+      r2.appendChild(btn("Delete", del));
+      return;
+    }
+    if (sel.length) {
+      var ns = sel.map(node).filter(Boolean), n = ns[0];
+      P.appendChild(el("h3", {}, ns.length > 1 ? ns.length + " shapes" : (TYPES[n.type] || TYPES.process).label));
+      if (ns.length === 1) {
+        P.appendChild(lab("Text")); var ta = el("textarea"); ta.value = n.text; P.appendChild(ta);
+        ta.addEventListener("input", function () { if (!ta._c) { change(); ta._c = 1; } n.text = ta.value; $("gNodes").innerHTML = doc.nodes.map(function (x) { return nodeSVG(x, true); }).join(""); $("gEdges").innerHTML = doc.edges.map(function (x) { return edgeSVG(x, true); }).join(""); renderUi(); persist(); });
+      }
+      P.appendChild(lab("Shape"));
+      var ss = el("select"); Object.keys(TYPES).forEach(function (k) { var op = el("option", { value: k }, TYPES[k].label); if (k === n.type) op.selected = true; ss.appendChild(op); }); P.appendChild(ss);
+      ss.addEventListener("change", function () { change(); ns.forEach(function (x) { x.type = ss.value; }); render(); persist(); });
+      P.appendChild(lab("Fill"));
+      var sw = el("div", { "class": "row" }); P.appendChild(sw);
+      FILLS.forEach(function (f) {
+        var b = el("button", { "class": "sw" + (n.fill === f ? " on" : ""), title: f || "Default" }); b.style.background = f || "var(--panel)";
+        if (!f) b.textContent = "∅";
+        b.addEventListener("click", function () { change(); ns.forEach(function (x) { x.fill = f; }); render(); persist(); });
+        sw.appendChild(b);
+      });
+      var bl = el("label"); bl.style.cssText = "display:flex;gap:6px;align-items:center;color:var(--text)"; var cb = el("input", { type: "checkbox" }); cb.checked = !!n.bold; bl.appendChild(cb); bl.appendChild(document.createTextNode("Bold text")); P.appendChild(bl);
+      cb.addEventListener("change", function () { change(); ns.forEach(function (x) { x.bold = cb.checked; }); render(); persist(); });
+      if (ns.length === 1) {
+        P.appendChild(lab("Size (width × height)"));
+        var r3 = el("div", { "class": "row" }), wi = el("input", { type: "number", min: 40, step: 10 }), hi2 = el("input", { type: "number", min: 30, step: 10 });
+        wi.value = n.w; hi2.value = n.h; wi.style.width = hi2.style.width = "48%"; r3.appendChild(wi); r3.appendChild(hi2); P.appendChild(r3);
+        wi.addEventListener("change", function () { change(); n.w = Math.max(40, +wi.value || n.w); render(); persist(); });
+        hi2.addEventListener("change", function () { change(); n.h = Math.max(30, +hi2.value || n.h); render(); persist(); });
+      }
+      if (ns.length > 1) {
+        P.appendChild(lab("Line up"));
+        var r4 = el("div", { "class": "row" }); P.appendChild(r4);
+        function al(fn) { return function () { change(); fn(ns.map(box)); render(); persist(); }; }
+        r4.appendChild(btn("Left", al(function (B) { var m = Math.min.apply(null, B.map(function (b) { return b.x; })); ns.forEach(function (x) { x.x = m; }); })));
+        r4.appendChild(btn("Centre", al(function (B) { var m = B[0].cx; ns.forEach(function (x) { x.x = snap(m - x.w / 2); }); }), "Centre on the first selected shape"));
+        r4.appendChild(btn("Top", al(function (B) { var m = Math.min.apply(null, B.map(function (b) { return b.y; })); ns.forEach(function (x) { x.y = m; }); })));
+        r4.appendChild(btn("Middle", al(function (B) { var m = B[0].cy; ns.forEach(function (x, i) { x.y = snap(m - B[i].h / 2); }); }), "Middle of the first selected shape"));
+        var r5 = el("div", { "class": "row" }); r5.style.marginTop = "6px"; P.appendChild(r5);
+        r5.appendChild(btn("Space across", al(function (B) { var o = ns.slice().sort(function (a, b) { return a.x - b.x; }); var a = o[0].x, z = o[o.length - 1].x, step = (z - a) / (o.length - 1); o.forEach(function (x, i) { x.x = snap(a + step * i); }); })));
+        r5.appendChild(btn("Space down", al(function (B) { var o = ns.slice().sort(function (a, b) { return a.y - b.y; }); var a = o[0].y, z = o[o.length - 1].y, step = (z - a) / (o.length - 1); o.forEach(function (x, i) { x.y = snap(a + step * i); }); })));
+        if (ns.length === 2) { var r6 = el("div", { "class": "row" }); r6.style.marginTop = "6px"; P.appendChild(r6); r6.appendChild(btn("Connect " + "1 → 2", function () { change(); addEdge(ns[0].id, ns[1].id); render(); persist(); })); }
+      }
+      var r7 = el("div", { "class": "row" }); P.appendChild(lab("")); P.appendChild(r7);
+      r7.appendChild(btn("Duplicate", function () { copySel(); paste(30); }));
+      r7.appendChild(btn("Delete", del));
+      return;
+    }
+    // nothing selected: diagram settings
+    P.appendChild(el("h3", {}, "Diagram"));
+    P.appendChild(lab("Name")); var dn = el("input", { type: "text" }); dn.value = doc.name; P.appendChild(dn);
+    dn.addEventListener("change", function () { change(); doc.name = dn.value.trim() || "Untitled flowchart"; persist(); fillDocs(); });
+    P.appendChild(lab("Tidy direction"));
+    var ds = el("select"); [["TB", "Top to bottom"], ["LR", "Left to right"]].forEach(function (o) { var op = el("option", { value: o[0] }, o[1]); if (doc.dir === o[0]) op.selected = true; ds.appendChild(op); }); P.appendChild(ds);
+    ds.addEventListener("change", function () { change(); doc.dir = ds.value; persist(); });
+    P.appendChild(lab("Swimlanes"));
+    var r8 = el("div", { "class": "row" }); P.appendChild(r8);
+    r8.appendChild(btn("Add lane", function () { change(); doc.lanes.push({ id: uid("l"), name: "Lane " + (doc.lanes.length + 1), h: 180 }); if (doc.lanes.length === 1) doc.dir = "LR"; render(); persist(); }));
+    P.appendChild(el("p", { "class": "hint" }, doc.nodes.length + " shapes, " + doc.edges.length + " arrows" + (doc.lanes.length ? ", " + doc.lanes.length + " lanes" : "") + "."));
+    var r9 = el("div", { "class": "row" }); P.appendChild(lab("")); P.appendChild(r9);
+    r9.appendChild(btn("Delete this diagram", function () {
+      if (!confirm("Delete \"" + doc.name + "\" from this browser? Save it as a file first if you want to keep it.")) return;
+      delete store.docs[store.cur]; store.cur = null; load(); undo = []; redo = []; clearSel(); fit(); persist();
+    }));
+    P.appendChild(el("p", { "class": "hint" }, "Click a shape to change it. Double-click empty space to add a step there."));
+  }
+
+  // ---------- diagrams list, files ----------
+  function fillDocs() {
+    var s = $("docSel"); s.innerHTML = "";
+    Object.keys(store.docs).sort(function (a, b) { return (store.docs[b].updated || 0) - (store.docs[a].updated || 0); }).forEach(function (id) {
+      var o = el("option", { value: id }, store.docs[id].doc.name || "Untitled"); if (id === store.cur) o.selected = true; s.appendChild(o);
+    });
+  }
+  $("docSel").addEventListener("change", function () { closeEdit(true); store.docs[store.cur] = { updated: Date.now(), doc: doc }; store.cur = this.value; doc = store.docs[store.cur].doc; undo = []; redo = []; clearSel(); fit(); });
+  $("newBtn").addEventListener("click", function () {
+    closeEdit(true); store.docs[store.cur] = { updated: Date.now(), doc: doc };
+    store.cur = "d" + Date.now(); doc = blank("Flowchart " + (Object.keys(store.docs).length + 1)); store.docs[store.cur] = { updated: Date.now(), doc: doc };
+    undo = []; redo = []; clearSel(); view = { tx: 60, ty: 40, z: 1 }; render(); persist(); fillDocs();
+  });
+  $("saveBtn").addEventListener("click", function () {
+    var b = new Blob([JSON.stringify({ bitkFlow: 1, doc: doc }, null, 1)], { type: "application/json" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = (doc.name || "flowchart").replace(/[\\/:*?"<>|]+/g, "-") + ".flow.json"; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+  $("openBtn").addEventListener("click", function () { $("openFile").click(); });
+  $("openFile").addEventListener("change", function () {
+    var f = this.files[0]; if (!f) return; var r = new FileReader();
+    r.onload = function () { openText(r.result, f.name); };
+    r.readAsText(f); this.value = "";
+  });
+  function openText(text, fname) {
+    try {
+      var j = JSON.parse(text), d = j.doc || j;
+      if (!d || !Array.isArray(d.nodes)) throw new Error("not a flowchart file");
+      d.edges = d.edges || []; d.lanes = d.lanes || []; d.name = d.name || (fname || "Imported").replace(/\.flow\.json$|\.json$/i, "");
+      store.docs[store.cur] = { updated: Date.now(), doc: doc };
+      store.cur = "d" + Date.now(); doc = d; store.docs[store.cur] = { updated: Date.now(), doc: doc };
+      undo = []; redo = []; clearSel(); fit(); persist(); fillDocs();
+    } catch (e) { alert("That file isn't a flowchart saved from this tool (" + e.message + ")."); }
+  }
+
+  // ---------- Mermaid ----------
+  function mermaid() {
+    var ids = {}, L = ["flowchart " + (doc.dir === "LR" ? "LR" : "TD")];
+    doc.nodes.forEach(function (n, i) { ids[n.id] = "n" + (i + 1); });
+    function q(t) { return '"' + String(t || " ").replace(/"/g, "#quot;").replace(/\n/g, "<br>") + '"'; }
+    function nd(n) {
+      var t = q(n.text), id = ids[n.id];
+      return id + ({ terminator: "([" + t + "])", decision: "{" + t + "}", io: "[/" + t + "/]", subprocess: "[[" + t + "]]", database: "[(" + t + ")]", circle: "((" + t + "))", document: "[" + t + "]", note: "[" + t + "]" }[n.type] || "[" + t + "]");
+    }
+    if (doc.lanes.length) {
+      var G = laneGeom(), used = {};
+      G.lanes.forEach(function (r, i) {
+        var inL = doc.nodes.filter(function (n) { var c = box(n).cy; return c >= r.y && c < r.y + r.h; });
+        if (!inL.length) return;
+        L.push("  subgraph lane" + (i + 1) + "[" + q(r.l.name) + "]");
+        inL.forEach(function (n) { used[n.id] = 1; L.push("    " + nd(n)); });
+        L.push("  end");
+      });
+      doc.nodes.forEach(function (n) { if (!used[n.id]) L.push("  " + nd(n)); });
+    } else doc.nodes.forEach(function (n) { L.push("  " + nd(n)); });
+    doc.edges.forEach(function (e) {
+      if (!ids[e.from] || !ids[e.to]) return;
+      var a = e.dash ? "-.->" : "-->"; if (e.arrow === "none") a = e.dash ? "-.-" : "---"; if (e.arrow === "both") a = e.dash ? "<-.->" : "<-->";
+      L.push("  " + ids[e.from] + " " + a + (e.label ? "|" + q(e.label) + "|" : "") + " " + ids[e.to]);
+    });
+    return L.join("\n");
+  }
+  $("exMmd").addEventListener("click", function () {
+    var t = mermaid(), b = this;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Mermaid"; }, 1500); }, function () { prompt("Copy this Mermaid text:", t); });
+  });
+
+  // ---------- Tidy layout ----------
+  function tidy(keepLanes) {
+    if (!doc.nodes.length) return;
+    var N = doc.nodes.filter(function (n) { return n.type !== "note"; }), byId = {}, out = {}, inc = {};
+    N.forEach(function (n) { byId[n.id] = n; out[n.id] = []; inc[n.id] = 0; });
+    var E = doc.edges.filter(function (e) { return byId[e.from] && byId[e.to]; });
+    // DFS from starts to find back edges (loops)
+    E.forEach(function (e) { out[e.from].push(e); });
+    var state = {}, back = {}, orderSeen = [];
+    var starts = N.filter(function (n) { return n.type === "terminator" && !E.some(function (e) { return e.to === n.id; }); });
+    N.forEach(function (n) { if (!E.some(function (e) { return e.to === n.id; }) && starts.indexOf(n) < 0) starts.push(n); });
+    if (!starts.length) starts = [N[0]];
+    function dfs(id) { state[id] = 1; orderSeen.push(id); out[id].forEach(function (e) { if (state[e.to] === 1) back[e.id] = 1; else if (!state[e.to]) dfs(e.to); }); state[id] = 2; }
+    starts.forEach(function (n) { if (!state[n.id]) dfs(n.id); });
+    N.forEach(function (n) { if (!state[n.id]) dfs(n.id); });
+    // longest-path ranks over forward edges
+    var rank = {}, fwd = E.filter(function (e) { return !back[e.id]; });
+    N.forEach(function (n) { rank[n.id] = 0; inc[n.id] = 0; });
+    fwd.forEach(function (e) { inc[e.to]++; });
+    var q = N.filter(function (n) { return !inc[n.id]; }).map(function (n) { return n.id; });
+    while (q.length) { var id = q.shift(); fwd.forEach(function (e) { if (e.from !== id) return; rank[e.to] = Math.max(rank[e.to], rank[id] + 1); if (!--inc[e.to]) q.push(e.to); }); }
+    // order within each rank: discovery order, then average of parents
+    var ranks = {}; orderSeen.forEach(function (id) { (ranks[rank[id]] = ranks[rank[id]] || []).push(id); });
+    var pos = {}; Object.keys(ranks).forEach(function (r) { ranks[r].forEach(function (id, i) { pos[id] = i; }); });
+    Object.keys(ranks).sort(function (a, b) { return a - b; }).forEach(function (r) {
+      var bc = {}; ranks[r].forEach(function (id) { var ps = fwd.filter(function (e) { return e.to === id; }).map(function (e) { return pos[e.from]; }); bc[id] = ps.length ? ps.reduce(function (a, b) { return a + b; }, 0) / ps.length : pos[id]; });
+      ranks[r].sort(function (a, b) { return bc[a] - bc[b] || pos[a] - pos[b]; });
+      ranks[r].forEach(function (id, i) { pos[id] = i; });
+    });
+    var maxR = Math.max.apply(null, Object.keys(ranks).map(Number));
+    var GX = 60, GY = 56;
+    if (doc.lanes.length) {
+      // left-to-right columns, each step stays in (or is given) a lane
+      var G = laneGeom(), laneOf = {};
+      N.forEach(function (n) {
+        if (n.lane !== undefined && doc.lanes[n.lane]) { laneOf[n.id] = n.lane; return; }
+        var c = box(n).cy, li = 0; G.lanes.forEach(function (r, i) { if (c >= r.y) li = i; }); laneOf[n.id] = li;
+      });
+      var colW = Math.max.apply(null, N.map(function (n) { return n.w; })) + 70, cells = {}, laneNeed = doc.lanes.map(function () { return 0; });
+      for (var r = 0; r <= maxR; r++) (ranks[r] || []).forEach(function (id) { var k = laneOf[id] + "|" + r; (cells[k] = cells[k] || []).push(id); });
+      Object.keys(cells).forEach(function (k) { var li = +k.split("|")[0], h = cells[k].reduce(function (a, id) { return a + box(byId[id]).h + 30; }, 0) + 40; laneNeed[li] = Math.max(laneNeed[li], h); });
+      doc.lanes.forEach(function (l, i) { l.h = Math.max(140, snap(laneNeed[i])); });
+      var y0 = []; var acc = 0; doc.lanes.forEach(function (l, i) { y0[i] = acc; acc += l.h; });
+      Object.keys(cells).forEach(function (k) {
+        var li = +k.split("|")[0], r = +k.split("|")[1], ids = cells[k];
+        var tot = ids.reduce(function (a, id) { return a + box(byId[id]).h; }, 0) + (ids.length - 1) * 30, y = y0[li] + (doc.lanes[li].h - tot) / 2;
+        ids.forEach(function (id) { var n = byId[id], h = box(n).h; n.x = Math.round(80 + r * colW + (colW - 70 - n.w) / 2); n.y = Math.round(y); y += h + 30; });
+      });
+    } else if (doc.dir === "LR") {
+      var x = 40;
+      for (r = 0; r <= maxR; r++) {
+        var ids = ranks[r] || [], wmax = Math.max.apply(null, ids.map(function (id) { return byId[id].w; }).concat([0]));
+        var tot = ids.reduce(function (a, id) { return a + box(byId[id]).h; }, 0) + (ids.length - 1) * GY, y = -tot / 2;
+        ids.forEach(function (id) { var n = byId[id]; n.x = Math.round(x + (wmax - n.w) / 2); n.y = Math.round(y); y += box(n).h + GY; });
+        x += wmax + GX + 40;
+      }
+    } else {
+      var yy = 40;
+      for (r = 0; r <= maxR; r++) {
+        var ids2 = ranks[r] || [], hmax = Math.max.apply(null, ids2.map(function (id) { return box(byId[id]).h; }).concat([0]));
+        var tot2 = ids2.reduce(function (a, id) { return a + byId[id].w; }, 0) + (ids2.length - 1) * GX, xx = -tot2 / 2;
+        ids2.forEach(function (id) { var n = byId[id]; n.x = Math.round(xx); n.y = Math.round(yy + (hmax - box(n).h) / 2); xx += n.w + GX; });
+        yy += hmax + GY;
+      }
+    }
+    doc.edges.forEach(function (e) { delete e.fs; delete e.ts; });
+    // notes: park them to the right of whatever they sat next to
+    var B = bounds(false), ny = B.y;
+    doc.nodes.filter(function (n) { return n.type === "note"; }).forEach(function (n) { n.x = snap(B.x + B.w + 60); n.y = snap(ny); ny += box(n).h + 20; });
+  }
+  $("tidyBtn").addEventListener("click", function () { if (!doc.nodes.length) return; change(); tidy(); render(); fit(); persist(); });
+
+  // ---------- From text ----------
+  var TEXT_SAMPLE = [
+    "(Start)",
+    "Application received",
+    "Check entry requirements?",
+    "  Yes: Invite to interview",
+    "  No: Offer alternative course",
+    "    Learner accepts?",
+    "      Yes -> Invite to interview",
+    "      No: (Withdrawn)",
+    "Interview outcome recorded",
+    "/Enter offer in EBS/",
+    "[[Run enrolment workflow]]",
+    "(End)"
+  ].join("\n");
+  $("textBtn").addEventListener("click", function () { $("textIn").value = store.lastText || TEXT_SAMPLE; $("textDlg").showModal(); $("textIn").focus(); });
+  $("textCancel").addEventListener("click", function () { $("textDlg").close(); });
+  $("textGo").addEventListener("click", function () {
+    var t = $("textIn").value;
+    try { var d = fromText(t); } catch (e) { alert(e.message); return; }
+    if (!d.nodes.length) { alert("Write at least one step."); return; }
+    store.lastText = t;
+    change(); d.name = doc.name; doc.nodes = d.nodes; doc.edges = d.edges; doc.lanes = d.lanes; doc.dir = d.lanes.length ? "LR" : "TB";
+    clearSel(); tidy(); doc.nodes.forEach(function (n) { delete n.lane; });
+    $("textDlg").close(); render(); fit(); persist();
+  });
+  function fromText(src) {
+    var lines = [], lanes = [], curLane;
+    src.split(/\r?\n/).forEach(function (raw) {
+      if (!raw.trim() || /^\s*\/\//.test(raw)) return;
+      var m = /^\s*##\s*(.+)$/.exec(raw);
+      if (m) {
+        var nm = m[1].trim(), ex = lanes.map(function (l) { return l.name.toLowerCase(); }).indexOf(nm.toLowerCase());
+        if (ex >= 0) curLane = ex; else { lanes.push({ id: "l" + (lanes.length + 1), name: nm, h: 180 }); curLane = lanes.length - 1; }
+        return;
+      }
+      var ind = raw.match(/^\s*/)[0].replace(/\t/g, "    ").length;
+      lines.push({ ind: ind, text: raw.trim(), lane: curLane, kids: [] });
+    });
+    // tree by indentation
+    var root = { ind: -1, kids: [] }, stack = [root];
+    lines.forEach(function (l) { while (stack.length > 1 && stack[stack.length - 1].ind >= l.ind) stack.pop(); stack[stack.length - 1].kids.push(l); stack.push(l); });
+    var nodes = [], edges = [], byName = {}, jumps = [], nid = 0, eid = 0;
+    function parseItem(t, allowLabel) {
+      var o = { label: "", jump: "", text: t };
+      if (!allowLabel) { var jj = /^(.*?)\s*->\s*(.+)$/.exec(t); if (jj) { o.text = jj[1].trim(); o.jump = jj[2].trim(); } return o; }
+      var lm = /^([^:>\[\(\{\/]{1,24}?)\s*:\s+(.*)$/.exec(t); // "Yes: step"
+      var lj = /^([^:>\[\(\{\/]{1,24}?)\s*->\s*(.+)$/.exec(t); // "Yes -> step"
+      if (lj && !/\s/.test(lj[1].trim()) ) { o.label = lj[1].trim(); o.jump = lj[2].trim(); o.text = ""; return o; }
+      if (lm) { o.label = lm[1].trim(); t = lm[2]; }
+      var j = /^(.*?)\s*->\s*(.+)$/.exec(t);
+      if (j) { t = j[1]; o.jump = j[2].trim(); }
+      o.text = t.trim(); return o;
+    }
+    function kind(t) {
+      var m;
+      if ((m = /^\(\((.*)\)\)$/.exec(t))) return ["circle", m[1]];
+      if ((m = /^\((.*)\)$/.exec(t))) return ["terminator", m[1]];
+      if ((m = /^\[\[(.*)\]\]$/.exec(t))) return ["subprocess", m[1]];
+      if ((m = /^\/(.*)\/$/.exec(t))) return ["io", m[1]];
+      if ((m = /^\{(.*)\}$/.exec(t))) return ["document", m[1]];
+      if ((m = /^\[\((.*)\)\]$/.exec(t))) return ["database", m[1]];
+      if (/\?$/.test(t)) return ["decision", t];
+      if (/^(start|end|stop|finish)$/i.test(t)) return ["terminator", t];
+      return ["process", t];
+    }
+    function key(t) { return kind(t)[1].trim().toLowerCase(); }
+    function make(t, lane) {
+      var k = kind(t), d = TYPES[k[0]];
+      var n = { id: "n" + (++nid), type: k[0], x: 0, y: 0, w: d.w, h: d.h, text: k[1].trim(), fill: d.fill };
+      if (lane !== undefined) n.lane = lane;
+      nodes.push(n); if (!byName[key(t)]) byName[key(t)] = n; return n;
+    }
+    function link(tails, n, label) { tails.forEach(function (t, i) { edges.push({ id: "e" + (++eid), from: t.id, to: n.id, label: (t.label !== undefined ? t.label : (i === 0 ? label : "")) || "" }); }); }
+    function walk(list, tails, firstLabel) {
+      var cur = tails.map(function (t) { return { id: t.id, label: firstLabel }; });
+      list.forEach(function (item, idx) {
+        var it = parseItem(item.text, false), lbl = idx === 0 ? firstLabel : "";
+        if (!it.text && it.jump) { cur.forEach(function (t) { jumps.push({ from: t.id, to: it.jump, label: it.label || t.label || "" }); }); cur = []; return; }
+        var n = make(it.text, item.lane), hadIn = cur.length > 0;
+        cur.forEach(function (t) { edges.push({ id: "e" + (++eid), from: t.id, to: n.id, label: t.label || "" }); });
+        if (it.jump) { jumps.push({ from: n.id, to: it.jump, label: "" }); cur = []; }
+        else if (n.type === "terminator" && hadIn) cur = [];
+        else cur = [{ id: n.id, label: "" }];
+        if (item.kids.length) {
+          if (n.type === "decision") {
+            // each child with a "Label:" starts a branch; others continue it
+            var branches = [], b = null;
+            item.kids.forEach(function (k) { var pi = parseItem(k.text, true); if (pi.label || !b) { b = { label: pi.label, items: [] }; branches.push(b); } b.items.push(k); });
+            var outT = [];
+            branches.forEach(function (br) {
+              var first = br.items[0], fp = parseItem(first.text, true);
+              var copy = br.items.map(function (x, i) { return i === 0 && fp.label ? { text: (fp.text || "") + (fp.jump ? " -> " + fp.jump : ""), kids: x.kids, lane: x.lane, ind: x.ind, _jumpOnly: !fp.text && fp.jump } : x; });
+              if (copy[0]._jumpOnly) { jumps.push({ from: n.id, to: fp.jump, label: br.label }); return; }
+              outT = outT.concat(walk(copy, [n], br.label));
+            });
+            cur = outT;
+          } else cur = walk(item.kids, cur.length ? [n] : [], "");
+        }
+      });
+      return cur;
+    }
+    walk(root.kids, [], "");
+    jumps.forEach(function (j) {
+      var t = byName[key(j.to)] || byName[j.to.toLowerCase()];
+      if (!t) t = make(j.to);
+      edges.push({ id: "e" + (++eid), from: j.from, to: t.id, label: j.label || "" });
+    });
+    return { nodes: nodes, edges: edges, lanes: lanes };
+  }
+
+  function sample() {
+    var save = doc; doc = blank("Example: enrolment process");
+    var d = fromText(TEXT_SAMPLE); doc.nodes = d.nodes; doc.edges = d.edges; tidy(); var out = doc; doc = save; return out;
+  }
+
+  // ---------- toolbar ----------
+  $("undoBtn").addEventListener("click", undoIt); $("redoBtn").addEventListener("click", redoIt);
+  $("zIn").addEventListener("click", function () { var r = svg.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 1.2); });
+  $("zOut").addEventListener("click", function () { var r = svg.getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, 1 / 1.2); });
+  $("fitBtn").addEventListener("click", fit);
+  $("exSvg").addEventListener("click", function () { doExport("svg"); });
+  $("exPdf").addEventListener("click", function () { doExport("pdf"); });
+  $("exPng").addEventListener("click", function () { doExport("png"); });
+  new MutationObserver(function () { fontFam = uiFont(); render(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  window.addEventListener("resize", function () { render(); });
+
+  // handoff from the home page (.flow.json dropped there)
+  var hand = window.BITK && BITK.take();
+  load();
+  if (hand && hand.tool === "flow" && hand.files && hand.files[0]) openText(hand.files[0].text, hand.files[0].name);
+  fillDocs(); render();
+  requestAnimationFrame(function () { fontFam = uiFont(); fit(); });
+  window.__fc = { get doc() { return doc; }, fromText: fromText, mermaid: mermaid, tidy: tidy, render: render, sel: function () { return sel; } };
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>
