@@ -14,19 +14,31 @@
   .find .src { font-family: var(--mono); font-size: 12px; background: var(--panel); border-radius: 6px; padding: 6px 10px; margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
   .find .src mark { background: var(--warn-bg); color: var(--warn-text); border-radius: 2px; }
   .rules td:first-child { white-space: nowrap; }
+  .steps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+  .step { display: flex; align-items: center; gap: 7px; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px 3px 4px; font-size: 13px; background: var(--panel); }
+  .step .n { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--tint); color: var(--accent); }
+  .step .mk { font-weight: 700; min-width: 1ch; }
+  .step.ok .mk { color: var(--ok, #2e8b57); }
+  .step.error { border-color: var(--danger); cursor: pointer; } .step.error .mk { color: var(--danger); }
+  .step.warn { border-color: var(--warn-text); cursor: pointer; } .step.warn .mk { color: var(--warn-text); }
+  .step.info { cursor: pointer; } .step.info .mk { color: var(--muted); }
+  .step.off { opacity: .5; }
+  .find .hd .stp { margin-left: auto; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 </style>
 </head>
 <body>
 <main>
   <h1>SQL Checker</h1>
-  <p class="lead">Paste a T-SQL query to catch common logic bugs, performance traps and things the EBS Central query validator rejects. Checks run in your browser as you type.</p>
+  <p class="lead">Paste a T-SQL query and it runs through seven steps: structure, names, query shape, logic, performance, your schema and the EBS validator. It catches syntax slips SQL Server would reject, as well as logic bugs that run but give wrong answers. Checks run in your browser as you type.</p>
   <details class="howto"><summary>How to use</summary>
     <ol>
       <li>Paste a query into the box. Checks run as you type.</li>
-      <li>Results are <strong>errors</strong> (almost always wrong), <strong>warnings</strong> (often wrong, check them) and <strong>tips</strong> (performance or style). Untick <strong>Show tips</strong> to hide tips.</li>
+      <li>The row of numbered steps shows what was checked: ✓ means that step passed, a number means it found something (click it to jump there).</li>
+      <li>Results are <strong>errors</strong> (SQL Server will reject it, or it's almost always wrong), <strong>warnings</strong> (often wrong, check them) and <strong>tips</strong> (performance or style). Untick <strong>Show tips</strong> to hide tips.</li>
+      <li>Load your database in the <a href="../schema-map/index.html">Schema Map</a> tool to switch on step 6: it then checks that every table and column exists, suggests the right name for typos, and spots text compared with number columns.</li>
       <li>Click a result to highlight that spot in your query. Most results show a suggested fix underneath.</li>
       <li>For EBS Central screens, keep <strong>EBS mode</strong> on. When the validator rejects something new, add it to the list and it will be flagged from then on.</li>
-      <li>It's a pattern checker, not a full SQL parser, so treat each hit as a question to check rather than a certain bug.</li>
+      <li>It checks without connecting to a database, so treat each hit as a question to check rather than a certain bug.</li>
     </ol>
     <p>Click <strong>Load sample</strong> to see each kind of result.</p>
   </details>
@@ -44,6 +56,7 @@
     <textarea id="banned" spellcheck="false"></textarea>
   </div>
 
+  <div class="steps" id="steps"></div>
   <div class="summary" id="summary"></div>
   <div id="out"></div>
 
@@ -51,6 +64,11 @@
     <summary>What it checks</summary>
     <table class="rules">
       <tbody>
+        <tr><td>1 Structure</td><td>Unclosed quotes, comments, <code>[</code> and brackets; extra or missing commas; <code>BEGIN</code>/<code>END</code>, <code>CASE</code>/<code>END</code>, <code>TRY</code>/<code>CATCH</code> pairs; <code>GROUP</code>/<code>ORDER</code> without <code>BY</code>; empty <code>IN ()</code>; a condition missing after <code>AND</code>, <code>WHERE</code> or <code>=</code>; common keyword typos; <code>WITH</code> needing a <code>;</code> before it.</td></tr>
+        <tr><td>2 Names</td><td>Aliases that don't exist, a table name used after it's been aliased, the same alias twice, undeclared or unused variables (SSRS parameters are recognised), unused CTEs, SELECT aliases used in <code>WHERE</code>/<code>GROUP BY</code>.</td></tr>
+        <tr><td>3 Query shape</td><td>Columns missing from <code>GROUP BY</code>, aggregates mixed with plain columns, aggregates or <code>ROW_NUMBER()</code> in <code>WHERE</code>/<code>ON</code>, nested aggregates, <code>JOIN</code> without <code>ON</code>, <code>ON</code> after <code>APPLY</code>/<code>CROSS JOIN</code>, <code>UNION</code> column counts, <code>ORDER BY</code> in subqueries, views or before <code>UNION</code>, unnamed or duplicate columns in CTEs/derived tables/<code>SELECT INTO</code>, <code>INSERT</code> column/value counts, CTE column lists, multi-column subqueries.</td></tr>
+        <tr><td>4 Logic</td><td>Everything below, plus <code>ON</code> conditions that don't mention the joined table, a column compared with itself, <code>x = 1 AND x = 2</code>, <code>NOT IN (..., NULL)</code>, <code>DATEDIFF(YEAR)</code> used as an age, <code>UPDATE</code>/<code>DELETE</code> without <code>WHERE</code>, temp tables created twice, subqueries that could return several rows, <code>LIKE</code> with no wildcard.</td></tr>
+        <tr><td>6 Schema</td><td>With Schema Map loaded: unknown tables, unknown columns (with a "did you mean"), text compared with number columns and numbers compared with text columns.</td></tr>
         <tr><td><span class="sev error">error</span></td><td><code>= NULL</code> or <code>&lt;&gt; NULL</code> in a condition. Never true. Use <code>IS NULL</code>.</td></tr>
         <tr><td><span class="sev error">error</span></td><td>EBS mode: anything on your rejects list, e.g. <code>OUTER APPLY</code>, <code>STRING_AGG</code>, with a rewrite that the validator accepts.</td></tr>
         <tr><td><span class="sev warn">warn</span></td><td><code>AND</code> and <code>OR</code> at the same level with no brackets.</td></tr>
@@ -63,10 +81,11 @@
         <tr><td><span class="sev info">tip</span></td><td><code>'2026-08-01'</code> with <code>datetime</code> under British settings, <code>BETWEEN</code> with date-only ends, functions on columns in <code>WHERE</code>/<code>ON</code>, leading <code>%</code> in <code>LIKE</code>, <code>SELECT *</code>, <code>DISTINCT</code>, <code>UNION</code> without <code>ALL</code>, <code>NOLOCK</code>, comma joins.</td></tr>
       </tbody>
     </table>
-    <p class="meta">This is a pattern checker, not a full SQL parser. It can miss things and can flag something you meant to do. Treat each hit as a question to check.</p>
+    <p class="meta">It reads the query the way SQL Server would but without a database connection, so it can't know every table or column unless Schema Map is loaded. It can miss things and can flag something you meant to do. Treat each hit as a question to check.</p>
   </details>
 </main>
 
+<script src="validate.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -96,7 +115,7 @@
 
   // ---------- Tokenizer ----------
   function tokenize(s) {
-    var T = [], i = 0, n = s.length;
+    var T = [], i = 0, n = s.length; T.bad = [];
     function push(t, v, st, u) { T.push({ t: t, v: v, u: u !== undefined ? u : v.toUpperCase(), s: st, e: i }); }
     while (i < n) {
       var c = s[i], st = i;
@@ -105,17 +124,22 @@
       if (c === "/" && s[i + 1] === "*") {
         var d = 1; i += 2;
         while (i < n && d > 0) { if (s[i] === "/" && s[i + 1] === "*") { d++; i += 2; } else if (s[i] === "*" && s[i + 1] === "/") { d--; i += 2; } else i++; }
+        if (d > 0) T.bad.push({ s: st, e: st + 2, title: "Comment never closed", msg: "This /* has no matching */, so everything after it is ignored." });
         continue;
       }
       if (c === "'" || ((c === "N" || c === "n") && s[i + 1] === "'")) {
         if (c !== "'") i++;
         i++; var v = "";
-        while (i < n) { if (s[i] === "'") { if (s[i + 1] === "'") { v += "'"; i += 2; continue; } i++; break; } v += s[i++]; }
+        var closed = false;
+        while (i < n) { if (s[i] === "'") { if (s[i + 1] === "'") { v += "'"; i += 2; continue; } i++; closed = true; break; } v += s[i++]; }
+        if (!closed) T.bad.push({ s: st, e: Math.min(n, st + 12), title: "Quote never closed", msg: "This ' starts some text that never ends, so the rest of the query is read as text. Check for a missing ' (or a ' inside the text that should be '')." });
         push("str", v, st, v); continue;
       }
       if (c === "[") {
         i++; var b = "";
-        while (i < n) { if (s[i] === "]") { if (s[i + 1] === "]") { b += "]"; i += 2; continue; } i++; break; } b += s[i++]; }
+        var bc = false;
+        while (i < n) { if (s[i] === "]") { if (s[i + 1] === "]") { b += "]"; i += 2; continue; } i++; bc = true; break; } b += s[i++]; }
+        if (!bc) T.bad.push({ s: st, e: Math.min(n, st + 12), title: "[ never closed", msg: "This [ has no matching ]." });
         push("id", b, st); continue;
       }
       if (c === '"') { i++; var q = ""; while (i < n && s[i] !== '"') q += s[i++]; i++; push("id", q, st); continue; }
@@ -313,7 +337,7 @@
       }
 
       // EXISTS correlation
-      if (u === "EXISTS" && V(i + 1) === "(" && M[i + 1] !== undefined) checkExists(i, i + 1, M[i + 1]);
+      if (u === "EXISTS" && V(i + 1) === "(" && M[i + 1] !== undefined && !/^(IF|WHILE)$/.test(W(i - 1)) && !(W(i - 1) === "NOT" && /^(IF|WHILE)$/.test(W(i - 2)))) checkExists(i, i + 1, M[i + 1]);
 
       // Integer division
       if (V(i) === "/" ) checkDiv(i);
@@ -419,7 +443,16 @@
       return y + ("0" + m[2]).slice(-2) + ("0" + m[1]).slice(-2) + "  (if it's day/month/year)";
     }
 
-    F.sort(function (a, b) { return a.s - b.s; });
+    F.forEach(function (f) {
+      if (f.step) return;
+      f.step = /^EBS/.test(f.title) ? "ebs" : /Function on a column|LIKE with a leading|SELECT \*|^DISTINCT|UNION without ALL|NOLOCK|Comma join/.test(f.title) ? "perf" : "logic";
+    });
+    if (window.SQLValidate) {
+      try { window.SQLValidate(T, M, src, { KW: KW, schema: opts.schema }).forEach(function (f) { F.push(f); }); }
+      catch (e) { F.push({ step: "structure", sev: "info", s: 0, e: 0, title: "Some checks couldn't run", msg: "The extra checks hit a problem with this query (" + e.message + "). The rest still ran." }); }
+    }
+    var order = { error: 0, warn: 1, info: 2 };
+    F.sort(function (a, b) { return a.s - b.s || order[a.sev] - order[b.sev]; });
     return F;
   }
 
@@ -444,6 +477,27 @@
     "GROUP BY p.PERSON_CODE, p.SURNAME, la.AIM_TYPE;"
   ].join("\n");
 
+  function loadSchema() {
+    try {
+      var s = JSON.parse(localStorage.getItem("bitk.schemamap.v1") || "null"); if (!s || !s.text) return null;
+      var tables = {}, n = 0;
+      s.text.split(/\r?\n/).forEach(function (l) {
+        var c = (l.indexOf("\t") >= 0 ? l.split("\t") : l.split(",")).map(function (x) { return x.trim(); });
+        if ((c[0] || "").toUpperCase() !== "C" || c.length < 4) return;
+        var t = c[2].toUpperCase(); if (!tables[t]) { tables[t] = {}; n++; }
+        tables[t][c[3].toUpperCase()] = (c[4] || "").toLowerCase();
+      });
+      return n ? { tables: tables, count: n, db: s.db || "" } : null;
+    } catch (e) { return null; }
+  }
+  var STEPS = [["structure", "Structure", "brackets, quotes, commas, BEGIN/END, CASE/END, typos"],
+               ["names", "Names", "aliases, variables, CTEs"],
+               ["shape", "Query shape", "GROUP BY, UNION, INSERT counts, ORDER BY, joins"],
+               ["logic", "Logic", "NULLs, filters, joins that multiply rows"],
+               ["perf", "Performance", "index-blocking patterns"],
+               ["schema", "Schema", "tables, columns and types from your Schema Map"],
+               ["ebs", "EBS", "your validator rejects list"]];
+
   function lineInfo(src, pos) {
     var before = src.slice(0, pos), line = before.split("\n").length;
     var ls = before.lastIndexOf("\n") + 1, le = src.indexOf("\n", pos); if (le < 0) le = src.length;
@@ -452,11 +506,12 @@
 
   function render() {
     var src = $("sql").value, out = $("out"), sum = $("summary");
-    out.innerHTML = ""; sum.innerHTML = "";
+    out.innerHTML = ""; sum.innerHTML = ""; $("steps").innerHTML = "";
     if (!src.trim()) return;
     var banned = $("banned").value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
     var F;
-    try { F = analyse(src, { ebs: $("ebs").checked, banned: banned }); }
+    var schema = loadSchema();
+    try { F = analyse(src, { ebs: $("ebs").checked, banned: banned, schema: schema }); }
     catch (e) { sum.textContent = "Couldn't read this query: " + e.message; return; }
     var counts = { error: 0, warn: 0, info: 0 };
     F.forEach(function (f) { counts[f.sev]++; });
@@ -466,15 +521,29 @@
       var p = document.createElement("span"); p.className = "pill " + x[0]; p.textContent = counts[x[0]] + " " + (counts[x[0]] === 1 ? x[1].replace(/s$/, "") : x[1]); sum.appendChild(p);
     });
     if (!F.length) { var ok = document.createElement("span"); ok.className = "pill ok"; ok.textContent = "Nothing found"; sum.appendChild(ok); }
+    var stepsEl = $("steps"); stepsEl.innerHTML = "";
+    STEPS.forEach(function (st, n) {
+      var on = !(st[0] === "schema" && !schema) && !(st[0] === "ebs" && !$("ebs").checked);
+      var mine = F.filter(function (f) { return f.step === st[0]; });
+      var worst = mine.some(function (f) { return f.sev === "error"; }) ? "error" : mine.some(function (f) { return f.sev === "warn"; }) ? "warn" : mine.length ? "info" : "ok";
+      var c = document.createElement("div"); c.className = "step " + (on ? worst : "off");
+      c.title = st[2] + (st[0] === "schema" && !schema ? " (load a database in Schema Map to turn this on)" : st[0] === "schema" ? " · " + schema.count + " tables" + (schema.db ? " in " + schema.db : "") : "");
+      var mark = !on ? "–" : worst === "ok" ? "✓" : String(mine.length);
+      c.innerHTML = '<span class="n">' + (n + 1) + '</span><span class="nm"></span><span class="mk"></span>';
+      c.querySelector(".nm").textContent = st[1]; c.querySelector(".mk").textContent = mark;
+      if (on && mine.length) c.addEventListener("click", function () { var el = out.querySelector('.find[data-step="' + st[0] + '"]'); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); });
+      stepsEl.appendChild(c);
+    });
 
     F.filter(function (f) { return showInfo || f.sev !== "info"; }).forEach(function (f) {
       var li = lineInfo(src, f.s);
-      var d = document.createElement("div"); d.className = "find is-" + f.sev;
+      var d = document.createElement("div"); d.className = "find is-" + f.sev; d.setAttribute("data-step", f.step || "");
       var hd = document.createElement("div"); hd.className = "hd";
       var sv = document.createElement("span"); sv.className = "sev " + f.sev; sv.textContent = f.sev === "info" ? "tip" : f.sev;
       var ln = document.createElement("span"); ln.className = "ln"; ln.textContent = "Line " + li.line;
       var ti = document.createElement("span"); ti.className = "t"; ti.textContent = f.title;
-      hd.appendChild(sv); hd.appendChild(ln); hd.appendChild(ti); d.appendChild(hd);
+      var sp = document.createElement("span"); sp.className = "stp"; var stp = STEPS.filter(function (x) { return x[0] === f.step; })[0]; sp.textContent = stp ? stp[1] : "";
+      hd.appendChild(sv); hd.appendChild(ln); hd.appendChild(ti); hd.appendChild(sp); d.appendChild(hd);
       var m = document.createElement("div"); m.className = "m"; m.textContent = f.msg; d.appendChild(m);
       var srcEl = document.createElement("div"); srcEl.className = "src";
       var lineText = src.slice(li.ls, li.le), a = f.s - li.ls, b = Math.min(f.e, li.le) - li.ls;
