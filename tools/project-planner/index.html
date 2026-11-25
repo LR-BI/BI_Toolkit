@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Planner · BI Toolkit</title>
-<script src="../../assets/boot.js?v=202611251421"></script>
-<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251421">
-<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251421">
-<link rel="stylesheet" href="../../assets/style.css?v=202611251421">
+<script src="../../assets/boot.js?v=202611251521"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251521">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251521">
+<link rel="stylesheet" href="../../assets/style.css?v=202611251521">
 <style>
   main.wide { max-width: none; }
   .pp-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0 12px; }
@@ -102,6 +102,31 @@
   .qbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 8px 0; } .qbar button, .qbar select { min-height: 0; padding: 4px 9px; font-size: 13px; }
   .qbar .saved { font-size: 12px; color: var(--muted); margin-left: auto; }
   @media (max-width: 900px) { .sqlw { grid-template-columns: minmax(0, 1fr); } }
+  .scw { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .sced { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; background: var(--bg); min-width: 0; }
+  .sced h3 { margin: 14px 0 6px; font-size: 15px; } .sced h3:first-child { margin-top: 0; }
+  .sced .meta { font-size: 13px; color: var(--muted); display: flex; gap: 6px 14px; flex-wrap: wrap; }
+  .sced .chk { list-style: none; padding: 0; margin: 0; font-size: 13.5px; }
+  .sced .chk li { padding: 5px 8px; border-left: 3px solid var(--border); margin: 4px 0; background: var(--panel); border-radius: 0 6px 6px 0; }
+  .sced .chk li.bad { border-left-color: var(--danger); } .sced .chk li.warn { border-left-color: #d39b16; } .sced .chk li b { margin-right: 6px; }
+  .sced details.dl { border: 1px solid var(--border); border-radius: 6px; margin: 6px 0; background: var(--panel); padding: 0; }
+  .sced details.dl { margin: 6px 0; padding: 0; } .tree details { margin: 0; border: 0; padding: 0; }
+  .sced details.dl > summary .ty { font-size: 11.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; color: var(--muted); font-weight: 400; }
+  .sced details.dl > summary .vw { font-size: 12px; color: #7a4a00; background: #fff1cc; border-radius: 999px; padding: 0 7px; }
+  .sced details.dl > summary { padding: 6px 10px; cursor: pointer; font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sced details.dl > summary .hint { margin-left: auto; }
+  .sced details.dl pre { margin: 0; padding: 8px 10px; border-top: 1px solid var(--border); max-height: 360px; overflow: auto; font-size: 12px; background: var(--bg); white-space: pre; }
+  .sced .acts { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px; border-top: 1px solid var(--border); }
+  .sced .acts button, .sced .scbar button, .sced .scbar select { min-height: 0; padding: 3px 9px; font-size: 13px; }
+  .sced .scbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .qi .fixn { font-size: 11.5px; font-weight: 600; background: #fde4e4; color: #7a1f1f; border-radius: 999px; padding: 0 7px; margin-left: 4px; }
+  .tree, .tree ul { list-style: none; margin: 0; padding-left: 18px; font-size: 13.5px; }
+  .tree { padding-left: 0; } .tree li { margin: 3px 0; } .tree ul { border-left: 1px dashed var(--border); margin-left: 6px; }
+  .tree .ty { font-size: 11.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; color: var(--muted); margin-left: 4px; }
+  .tree details > summary { cursor: pointer; } .tree table { font-size: 12.5px; border-collapse: collapse; margin: 4px 0 6px; }
+  .tree td, .tree th { border: 1px solid var(--border); padding: 2px 6px; text-align: left; } .tree th { background: var(--panel); font-weight: 600; }
+  .tree .hid { color: var(--muted); }
+  @media (max-width: 900px) { .scw { grid-template-columns: minmax(0, 1fr); } }
   .dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
   .dcard { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
   .dcard .img { background: #fff; height: 220px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); cursor: zoom-in; }
@@ -131,6 +156,7 @@
       <li><strong>Open from GitHub</strong> lists every project saved in your repo, including ones that are no longer in this browser (new PC, cleared history), and opens any of them. Each saved project gets a <strong>View on GitHub</strong> link in its header.</li>
       <li><strong>GitHub</strong> (optional): save straight to a repo using a personal access token. This is the only part of the toolkit that talks to the internet, and only when you click it. Use a fine-grained token limited to one repo with <em>Contents: read and write</em>.</li>
       <li>Everything also saves in this browser automatically. Use <strong>Export file</strong> for a backup or to move to another PC.</li>
+          <li><strong>Screens:</strong> upload Screen Designer exports (<code>.uafx</code>). You can read each page version's DataLinks (SQL) and layout, see checks (validator problems, hard-coded dates, expander columns, writeback tables, access groups), send a DataLink to the SQL store or the EBS Validator Fixer, and download the original file again.</li>
     </ol>
   </details>
 
@@ -157,6 +183,7 @@
   <dialog class="pp-dlg" id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
 </main>
 
+<script src="uafx.js?v=202611251521"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -227,6 +254,7 @@
     if (dec.length) { L.push("## Decisions", ""); dec.forEach(function (n) { L.push("- **" + n.date + "**: " + n.title + (n.body ? " — " + n.body.replace(/\n+/g, " ") : "")); }); L.push(""); }
     if (other.length) { L.push("## Notes", ""); other.forEach(function (n) { L.push("### " + n.date + " · " + n.title + (n.kind === "meeting" ? " (meeting)" : ""), "", n.body || "", ""); }); }
     if ((p.queries || []).length) { L.push("## SQL", ""); p.queries.forEach(function (q) { L.push("- [" + q.name + "](sql/" + qfile(q) + ".sql)" + (q.db ? " · " + q.db : "") + (q.desc ? ": " + q.desc.replace(/\n+/g, " ") : "")); }); L.push(""); }
+    if ((p.screens || []).length) { L.push("## Screen Designer screens", ""); p.screens.forEach(function (sc) { L.push("- [" + sc.name + "](screens/" + sfile(sc) + ".uafx)" + (sc.title ? ": " + sc.title : "") + (sc.notes ? " · " + sc.notes.replace(/\n+/g, " ") : "")); }); L.push(""); }
     if ((p.diagrams || []).length) { L.push("## Diagrams", ""); p.diagrams.forEach(function (d) { L.push("![" + d.name + "](diagrams/" + dfile(d) + ".svg)", ""); }); }
     L.push("_Saved from BI Toolkit Project Planner, " + new Date().toISOString().slice(0, 16).replace("T", " ") + "_");
     return L.join("\n");
@@ -356,12 +384,12 @@
     S.innerHTML = '<div class="ph"><h2>' + esc(p.name) + '</h2><span class="chip st-' + p.status.replace(/\s/g, "") + '">' + esc(p.status) + '</span>' +
       ghLink(p) + (p.owner ? '<span class="chip">Owner: ' + esc(p.owner) + "</span>" : "") + (p.due ? '<span class="chip' + (p.due < today() && p.status !== "Done" ? " late" : "") + '">Due ' + esc(fmtDate(p.due)) + "</span>" : "") +
       '<button id="editP" style="min-height:0;padding:3px 10px;font-size:13px">Edit details</button></div>' +
-      '<div class="tabs" role="tablist">' + [["overview", "Overview", ""], ["tasks", "Tasks", openT], ["board", "Board", ""], ["notes", "Notes & decisions", p.notes.length], ["raid", "Risks & issues", openR], ["sql", "SQL", (p.queries || []).length], ["diagrams", "Diagrams", (p.diagrams || []).length], ["docs", "Write-ups", ""]].map(function (t) {
+      '<div class="tabs" role="tablist">' + [["overview", "Overview", ""], ["tasks", "Tasks", openT], ["board", "Board", ""], ["notes", "Notes & decisions", p.notes.length], ["raid", "Risks & issues", openR], ["sql", "SQL", (p.queries || []).length], ["diagrams", "Diagrams", (p.diagrams || []).length], ["screens", "Screens", (p.screens || []).length], ["docs", "Write-ups", ""]].map(function (t) {
         return '<button data-tab="' + t[0] + '" class="' + (tab === t[0] ? "on" : "") + '">' + t[1] + (t[2] !== "" ? '<span class="n">' + t[2] + "</span>" : "") + "</button>";
       }).join("") + '</div><div id="tabBody"></div>';
     S.querySelectorAll("[data-tab]").forEach(function (b) { b.addEventListener("click", function () { tab = b.getAttribute("data-tab"); renderPane(); }); });
     $("editP").addEventListener("click", editProject);
-    ({ overview: vOverview, tasks: vTasks, board: vBoard, notes: vNotes, raid: vRaid, sql: vSql, diagrams: vDiagrams, docs: vDocs })[tab]($("tabBody"), p);
+    ({ overview: vOverview, tasks: vTasks, board: vBoard, notes: vNotes, raid: vRaid, sql: vSql, diagrams: vDiagrams, screens: vScreens, docs: vDocs })[tab]($("tabBody"), p);
   }
 
   function vOverview(B, p) {
@@ -647,6 +675,8 @@
     var data = short ? shortMarkdown(p) : toMarkdown(p).replace(/\n## Diagrams\n[\s\S]*?(?=\n_Saved from)/, "\n");
     var dg = (p.diagrams || []).filter(function (d) { return d.mermaid; });
     var qs = p.queries || [];
+    var scr = p.screens || [];
+    if (scr.length) data += "\n\n## Screen Designer screens in this project\n" + scr.map(function (sc) { var I = parseScreen(sc), pg = I.pages[I.pages.length - 1]; return "- " + sc.name + (sc.title ? " (" + sc.title + ")" : "") + (pg ? ": DataLinks " + pg.datalinks.map(function (d) { return d.name; }).join(", ") + (pg.checks.filter(function (c) { return c.level !== "info"; }).length ? "; open checks: " + pg.checks.filter(function (c) { return c.level !== "info"; }).map(function (c) { return c.text; }).join(" / ") : "") : ""); }).join("\n");
     if (qs.length) data += "\n\n## SQL queries in this project\n" + qs.map(function (q) { return "- " + q.name + (q.db ? " (" + q.db + ")" : "") + (q.desc ? ": " + q.desc.replace(/\n+/g, " ") : ""); }).join("\n");
     if (dg.length) data += "\n\n## Process diagrams (Mermaid flowchart syntax)\n" + dg.map(function (d) { return "\n### " + d.name + "\n```mermaid\n" + (short && d.mermaid.length > 2500 ? d.mermaid.slice(0, 2500) + "\n%% (trimmed)" : d.mermaid) + "\n```"; }).join("\n");
     var rules = [
@@ -662,6 +692,144 @@
     return rules.join("\n") + "\n\nCALCULATED STATUS: " + calc + "\n\n=== PROJECT DATA START ===\n" + data + "\n=== PROJECT DATA END ===";
   }
   function claudePrompt(p, kind) { return aiPrompt(p, kind, "claude", false); }
+  // ---------- Screens (Screen Designer .uafx exports) ----------
+  var selS = null;
+  function sfile(sc) { if (!sc.file) sc.file = slug(sc.name || "screen") + "-" + sc.id.slice(-4); return sc.file; }
+  function parseScreen(sc) { try { return UAFX.parse(sc.xml); } catch (e) { return { pages: [], error: e.message }; } }
+  function addScreen(p, name, text) {
+    var info = UAFX.parse(text), now = new Date().toISOString(), nm = info.screenName || name.replace(/\.uafx$/i, "");
+    p.screens = p.screens || [];
+    var ex = p.screens.filter(function (x) { return x.name.toLowerCase() === nm.toLowerCase(); })[0];
+    if (ex) {
+      if (ex.xml === text) return { sc: ex, same: true };
+      ex.hist = ex.hist || []; ex.hist.push({ at: ex.updated, xml: ex.xml, file: ex.src }); if (ex.hist.length > 3) ex.hist.shift();
+      ex.xml = text; ex.title = info.title; ex.src = name; ex.updated = now; return { sc: ex, replaced: true };
+    }
+    var sc = { id: id("s"), name: nm, title: info.title || "", src: name, xml: text, notes: "", added: now, updated: now, hist: [] };
+    p.screens.push(sc); return { sc: sc };
+  }
+  // A made-up screen for the example project and the "Load example" button (no real screen content)
+  function exampleUafx() {
+    function anc(inner, at) { return "<UAF_ANC_Entity Type='" + (/PageConfig/.test(inner) ? 12 : 16) + "' UAFSchemaVersion='1' CreatedBy='example' CreatedDate='" + at + "' UpdatedBy='example' UpdatedDate='" + at + "' Comment='Example screen' JobNumber='' IssueNumber=''><UAF><SchemaVersion>1</SchemaVersion><UAFEntity><EntityVersion>51.0.1</EntityVersion>" + inner + "</UAFEntity></UAF></UAF_ANC_Entity>"; }
+    function x(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function dl(idn, name, sql, single) { return anc("<DataLinkEntity><ID>" + idn + "</ID><DataSourceID>1</DataSourceID><DataLinkName>" + name + "</DataLinkName><DataLookup>" + x(sql) + "</DataLookup><ExpectedResultType>" + (single ? 1 : 0) + "</ExpectedResultType><MaximumRows>" + (single ? 0 : 200) + "</MaximumRows><UpdatedDate>01/Sep/2026 10:00:00</UpdatedDate><Deleted>false</Deleted></DataLinkEntity>", "01/Sep/2026 10:00:00"); }
+    function col(idn, name, text, extra, attrs) { return "<ControlColumnConfigEntity><ColumnConfigID>" + idn + "</ColumnConfigID><ColumnName>" + name + "</ColumnName><DisplayText>" + x(text) + "</DisplayText><SequenceNumber>" + (idn % 100) + "</SequenceNumber>" + (extra || "") + "<TableColumn>" + name + "</TableColumn><CUSTOMATTRIBUTES>" + x(attrs || "CSSSTYLE=ParagraphStyle") + "</CUSTOMATTRIBUTES></ControlColumnConfigEntity>"; }
+    function ctl(idn, name, type, view, parent, attrs, cols, html) { return "<ControlConfigEntity><ControlConfigID>" + idn + "</ControlConfigID>" + (view ? "<ViewName>" + view + "</ViewName>" : "") + "<ConfigType>" + type + "</ConfigType><SequenceNumber>" + (idn % 10) + "</SequenceNumber><ControlName>" + name + "</ControlName><CUSTOMATTRIBUTES>" + x(attrs || "") + "</CUSTOMATTRIBUTES>" + (html ? "<HTMLTEMPLATE>" + x(html) + "</HTMLTEMPLATE>" : "") + (parent ? "<ParentID>" + parent + "</ParentID>" : "") + (cols || "") + "</ControlConfigEntity>"; }
+    var HID = "|VISIBLEXS=False|VISIBLESM=False|VISIBLEMD=False|VISIBLELG=False", ACC = '|EVENTHANDLER={"ControlledBy":{"Control":"AccessFormatter","Column":"ACCESS","Value":"1"},"IsInverse":true,"ClassNames":"hidden"}';
+    var dls = dl(9001, "DestList", "SELECT * FROM (\n  SELECT l.ID, l.LEARNER_REF, l.FIRST_NAME, l.LAST_NAME, l.COURSE,\n         d.DESTINATION, d.RECORDED_ON, 'Save' AS BUTTON\n  FROM EXAMPLE_LEARNERS l\n  OUTER APPLY (\n      SELECT TOP 1 x.DESTINATION, x.RECORDED_ON\n      FROM EXAMPLE_DESTINATIONS x\n      WHERE x.LEARNER_REF = l.LEARNER_REF\n      ORDER BY x.RECORDED_ON DESC) d\n  WHERE l.END_DATE >= '31/07/2026'\n) q\nWHERE {{search}}\nORDER BY q.LAST_NAME") +
+      dl(9002, "DestDetail", "SELECT * FROM (\n  SELECT l.ID, l.PHONE, l.EMAIL\n  FROM EXAMPLE_LEARNERS l\n) sq\nWHERE 1=1\n{{parent:DestList:ID}}", true) +
+      dl(9003, "Access", "SELECT CASE WHEN EXISTS (SELECT NULL FROM GROUP_LINKS WHERE GROUP_DEFS_ID IN (999) AND PERSON_CODE = u.EBS_PERSON_CODE) THEN 1 END ACCESS\nFROM USERS u\nWHERE u.NAME = {GLOBAL:UserName}", true);
+    var page = "<PageConfigEntity><PageConfigID>9100</PageConfigID><ScreenName>U_ExampleDestinations</ScreenName><Title>Example destinations check (made up)</Title><UpdatedDate>01/Sep/2026 10:05:00</UpdatedDate>" +
+      "<PageDefinitionEntity><PageDefinitionID>9101</PageDefinitionID><Description>U_ExampleDestinations_v1</Description><PageContext>General</PageContext></PageDefinitionEntity>" +
+      [9001, 9002, 9003].map(function (n) { return "<ConfigDataLinkEntity><DataLinkID>" + n + "</DataLinkID></ConfigDataLinkEntity>"; }).join("") +
+      ctl(9201, "DataFormatter", 75, "", "", "CSSSTYLE=PrimaryBorder" + ACC, col(9301, "", "", "", "SPANSM=12")) +
+      ctl(9202, "DestGrid", 76, "DestList", 9301, "CSSSTYLE=Primary|USERTABLE=UT_EXAMPLE_DESTINATIONS|EXPANDERCONTENTCONTROL=DestDetailPanel",
+        col(9401, "LEARNER_REF", "Learner ref") + col(9402, "FIRST_NAME", "First name") + col(9403, "LAST_NAME", "Last name") + col(9404, "COURSE", "Course") +
+        col(9405, "DESTINATION", "Destination", "<Editable>-1</Editable><LookUpSqlParam1>U_DESTINATIONS</LookUpSqlParam1>", "CSSSTYLE=Primary|WRITEBACKFIELD=DESTINATION") +
+        col(9406, "LEARNER_REF_WB", "Learner ref", "<Editable>-1</Editable>", "WRITEBACKFIELD=LEARNER_REF" + HID) + col(9407, "BUTTON", "", "", "ISSUBMIT=True|ROUTE=RestServiceWriteback")) +
+      ctl(9203, "DestDetailPanel", 4, "DestDetail", "", "DISPLAYINLINE=True" + HID, col(9501, "PHONE", "Phone") + col(9502, "EMAIL", "Email")) +
+      ctl(9204, "AccessFormatter", 75, "Access", "", "CSSSTYLE=DataFormatterBorder1Style" + HID, col(9601, "ACCESS", "Access", "", HID)) +
+      ctl(9205, "RowColours", 97, "", 9301, "CSSSTYLE=DataFormatterBorder1Style", "", "<style>\n.dest-missing { background: #fff1cc; }\n</style>") +
+      "</PageConfigEntity>";
+    return "<?xml version='1.0' encoding='utf-8'?><UAFEntities xmlType='True' DeltaXML='False'>" + dls + anc(page, "01/Sep/2026 10:05:00") + "</UAFEntities>";
+  }
+  function vScreens(B, p) {
+    var ss = p.screens || [];
+    if (selS && !ss.some(function (x) { return x.id === selS; })) selS = null;
+    if (!selS && ss.length) selS = ss[0].id;
+    B.innerHTML = '<div class="filters"><button class="primary" id="scAdd">Upload .uafx</button><input type="file" id="scFile" accept=".uafx,.xml" multiple hidden>' +
+      '<span class="hint">Screen Designer exports. Kept with the project and saved as <code>screens/*.uafx</code> to a folder or GitHub. You can also drop files here. Uploading the same screen again replaces it (the last 3 copies are kept).</span></div><div id="scMsg" class="hint"></div>' +
+      (ss.length ? '<div class="scw"><div class="qlist" id="scItems"></div><div class="sced" id="scEd"></div></div>'
+        : '<div class="empty">No screens yet. In Screen Designer, export a page or screen (.uafx) and upload it here to keep it with the project, read its DataLinks and layout, and check it for common problems. <button id="scEx" style="min-height:0;padding:3px 10px;font-size:13px">Load a made-up example</button></div>');
+    function importFiles(files) {
+      var left = files.length, msgs = [];
+      Array.prototype.forEach.call(files, function (f) {
+        var r = new FileReader();
+        r.onload = function () {
+          try { var res = addScreen(p, f.name, r.result); selS = res.sc.id; msgs.push(res.same ? f.name + ": already here, unchanged." : res.replaced ? f.name + ": replaced " + res.sc.name + " (previous copy kept)." : f.name + ": added as " + res.sc.name + "."); }
+          catch (e) { msgs.push(f.name + ": " + e.message); }
+          if (!--left) { touch(p); render(); var M = $("scMsg"); if (M) M.textContent = msgs.join(" "); }
+        };
+        r.readAsText(f);
+      });
+    }
+    $("scAdd").addEventListener("click", function () { $("scFile").click(); });
+    if ($("scEx")) $("scEx").addEventListener("click", function () { var r = addScreen(p, "U_ExampleDestinations.uafx", exampleUafx()); r.sc.notes = "Made-up example to show what the Screens tab reads. Remove it when you add your own."; selS = r.sc.id; touch(p); render(); });
+    $("scFile").addEventListener("change", function () { importFiles(this.files); this.value = ""; });
+    B.addEventListener("dragover", function (e) { if (e.dataTransfer && Array.prototype.some.call(e.dataTransfer.items || [], function (i) { return i.kind === "file"; })) e.preventDefault(); });
+    B.addEventListener("drop", function (e) { var fl = Array.prototype.filter.call(e.dataTransfer.files || [], function (f) { return /\.(uafx|xml)$/i.test(f.name); }); if (fl.length) { e.preventDefault(); importFiles(fl); } });
+    if (!ss.length) return;
+    var parsed = {}, verSel = {};
+    function info(sc) { return parsed[sc.id] || (parsed[sc.id] = parseScreen(sc)); }
+    function drawList() {
+      $("scItems").innerHTML = ss.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (sc) {
+        var I = info(sc), pg = I.pages[I.pages.length - 1], bad = pg ? pg.checks.filter(function (c) { return c.level === "bad"; }).length : 0;
+        return '<button class="qi' + (sc.id === selS ? " on" : "") + '" data-s="' + sc.id + '"><b>' + esc(sc.name) + (bad ? ' <span class="fixn">' + bad + " to fix</span>" : "") + "</b><span>" +
+          esc((sc.title || "") + " · " + I.pages.length + " page version" + (I.pages.length === 1 ? "" : "s")) + "</span></button>";
+      }).join("");
+      $("scItems").querySelectorAll("[data-s]").forEach(function (b) { b.addEventListener("click", function () { selS = b.getAttribute("data-s"); drawList(); drawEd(); }); });
+    }
+    function tree(list) {
+      if (!list.length) return "";
+      return "<ul>" + list.map(function (c) {
+        var vis = c.cols.filter(function (k) { return k.name; }), hid = vis.filter(function (k) { return k.hidden; }).length, ed = vis.filter(function (k) { return k.editable; }).length;
+        var bits = [c.view ? "DataLink " + c.view : "", vis.length ? vis.length + " columns" + (hid ? " (" + hid + " hidden" + (ed ? ", " + ed + " editable" : "") + ")" : ed ? " (" + ed + " editable)" : "") : "",
+          c.attrs.USERTABLE ? "writes to " + c.attrs.USERTABLE : "", c.attrs.EXPANDERCONTENTCONTROL ? "expands to " + c.attrs.EXPANDERCONTENTCONTROL : "",
+          c.event && c.event.ControlledBy ? (c.event.IsInverse ? "shown when " : "hidden when ") + c.event.ControlledBy.Control + "." + c.event.ControlledBy.Column + " = " + c.event.ControlledBy.Value : "",
+          c.hidden ? "hidden" : ""].filter(Boolean);
+        var head = "<b>" + esc(c.name) + '</b><span class="ty">' + esc(c.typeName) + "</span>" + (bits.length ? ' <span class="hint">' + esc(bits.join(" · ")) + "</span>" : "");
+        var table = vis.length ? "<table><tr><th>Column</th><th>Label</th><th>Notes</th></tr>" + vis.map(function (k) {
+          var n = [k.hidden ? "hidden" : "", k.editable ? "editable" : "", k.required ? "required" : "", k.writeback ? "writes " + k.writeback : "", k.lookup ? "lookup " + k.lookup : "", k.link ? (k.link.action || "link") + " → " + k.link.to : ""].filter(Boolean).join(", ");
+          return '<tr class="' + (k.hidden ? "hid" : "") + '"><td>' + esc(k.name) + "</td><td>" + esc(k.text) + "</td><td>" + esc(n) + "</td></tr>";
+        }).join("") + "</table>" : "";
+        return "<li>" + (table ? "<details><summary>" + head + "</summary>" + table + "</details>" : head) + tree(c.children) + "</li>";
+      }).join("") + "</ul>";
+    }
+    function drawEd() {
+      var sc = ss.filter(function (x) { return x.id === selS; })[0], E = $("scEd"); if (!sc) { E.innerHTML = ""; return; }
+      var I = info(sc);
+      if (!I.pages.length) { E.innerHTML = '<p style="color:var(--danger)">' + esc(I.error || "No pages found in this file.") + '</p><div class="scbar"><button id="scDel">Remove</button></div>'; $("scDel").onclick = remove; return; }
+      var vi = verSel[sc.id] != null ? verSel[sc.id] : I.pages.length - 1, pg = I.pages[vi];
+      var html = '<div class="scbar" style="margin-bottom:6px"><h3 style="margin:0;flex:1">' + esc(pg.screen) + ' <span class="hint">' + esc(pg.title) + "</span></h3>" +
+        (I.pages.length > 1 ? '<select id="scVer" title="Page versions in this file">' + I.pages.map(function (x, i) { return '<option value="' + i + '"' + (i === vi ? " selected" : "") + ">" + esc(x.version || "Page " + x.id) + " · " + esc(x.updated) + "</option>"; }).join("") + "</select>" : "") +
+        '<button id="scDl">Download .uafx</button><button id="scUp">Replace…</button><button id="scDel">Remove</button></div>' +
+        '<div class="meta"><span>Version: <b>' + esc(pg.version || "–") + "</b></span><span>Context: " + esc(pg.context || "–") + (pg.params.length ? " (" + esc(pg.params.map(function (x) { return x.name + (x.test ? " e.g. " + x.test : ""); }).join(", ")) + ")" : "") + "</span>" +
+        "<span>Last change: " + esc(pg.updated) + (pg.meta.by ? " by " + esc(pg.meta.by) : "") + "</span>" + (pg.meta.comment ? "<span>Comment: “" + esc(pg.meta.comment) + "”</span>" : "") +
+        "<span>File: " + esc(sc.src || "") + "</span>" + (sc.hist && sc.hist.length ? "<span>" + sc.hist.length + " older cop" + (sc.hist.length === 1 ? "y" : "ies") + " kept</span>" : "") + "</div>";
+      html += "<h3>Checks</h3>" + (pg.checks.length ? '<ul class="chk">' + pg.checks.map(function (c) { return '<li class="' + c.level + '"><b>' + (c.level === "bad" ? "Fix" : c.level === "warn" ? "Check" : "Note") + "</b>" + esc(c.text) + "</li>"; }).join("") + "</ul>" : '<p class="hint">Nothing found.</p>');
+      html += "<h3>DataLinks (" + pg.datalinks.length + ")</h3>" + pg.datalinks.map(function (d, i) {
+        var apply = /\b(OUTER|CROSS)\s+APPLY\b|\bSTRING_AGG\s*\(/i.test(d.sql || "");
+        return '<details class="dl"><summary><b>' + esc(d.name) + '</b><span class="ty">' + (d.single ? "one row" : "list" + (d.maxRows ? ", max " + d.maxRows : "")) + "</span>" + (apply ? '<span class="vw">APPLY / STRING_AGG</span>' : "") + '<span class="hint">' + (d.sql || "").split("\n").length + " lines</span></summary>" +
+          (d.sql ? "<pre>" + esc(d.sql) + '</pre><div class="acts"><button data-dc="' + i + '">Copy SQL</button><button data-ds="' + i + '">Add to SQL store</button><button data-dk="' + i + '">Check in SQL Checker</button>' + (apply ? '<button data-df="' + i + '" class="primary">Fix for EBS</button>' : "") + "</div>" : '<p class="hint" style="padding:0 10px">No SQL in this file.</p>') + "</details>";
+      }).join("");
+      html += "<h3>Layout</h3><ul class=\"tree\">" + tree(pg.roots).replace(/^<ul>|<\/ul>$/g, "") + "</ul>";
+      var htmls = pg.controls.filter(function (c) { return c.html && c.html.trim(); });
+      if (htmls.length) html += "<h3>Custom HTML (" + htmls.length + ")</h3>" + htmls.map(function (c, i) { return '<details class="dl"><summary><b>' + esc(c.name) + '</b><span class="hint">' + c.html.split("\n").length + ' lines</span></summary><pre>' + esc(c.html) + '</pre><div class="acts"><button data-hc="' + i + '">Copy</button></div></details>'; }).join("");
+      html += '<h3>Notes</h3><textarea id="scNotes" rows="3" style="width:100%;box-sizing:border-box" placeholder="What this screen is for, where it is in Ontrack, who uses it…">' + esc(sc.notes || "") + "</textarea>";
+      E.innerHTML = html;
+      function flash(b, t) { var o = b.textContent; b.textContent = t; setTimeout(function () { b.textContent = o; }, 1400); }
+      function copy(b, t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { flash(b, "Copied"); }, function () { flash(b, "Copy failed"); }); }
+      if ($("scVer")) $("scVer").onchange = function () { verSel[sc.id] = +this.value; drawEd(); };
+      $("scDl").onclick = function () { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([sc.xml], { type: "application/xml" })); a.download = sc.src && /\.uafx$/i.test(sc.src) ? sc.src : sfile(sc) + ".uafx"; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); };
+      $("scUp").onclick = function () { $("scFile").click(); };
+      function remove() { if (!confirm("Remove " + sc.name + " from this project?")) return; p.screens = p.screens.filter(function (x) { return x !== sc; }); selS = null; touch(p); render(); }
+      $("scDel").onclick = remove;
+      E.querySelectorAll("[data-dc]").forEach(function (b) { b.onclick = function () { copy(b, pg.datalinks[+b.getAttribute("data-dc")].sql); }; });
+      E.querySelectorAll("[data-hc]").forEach(function (b) { b.onclick = function () { copy(b, htmls[+b.getAttribute("data-hc")].html); }; });
+      E.querySelectorAll("[data-ds]").forEach(function (b) { b.onclick = function () {
+        var d = pg.datalinks[+b.getAttribute("data-ds")], nm = sc.name + " · " + d.name, ex = (p.queries || []).filter(function (q) { return q.name === nm; })[0];
+        if (ex) { if (ex.sql !== d.sql) { qHist(ex); ex.sql = d.sql; ex.updated = new Date().toISOString(); } }
+        else ex = newQuery(p, nm, d.sql, { db: "EBS", tags: "screen", desc: "DataLink " + d.name + " on Screen Designer screen " + sc.name + (pg.version ? " (" + pg.version + ")" : "") });
+        selQ = ex.id; touch(p); flash(b, "Added ✓");
+      }; });
+      function give(tool, page, d) { if (window.BITK && BITK.give({ tool: tool, files: [{ name: slug(sc.name + "-" + d.name) + ".sql", text: d.sql }] })) window.open("../" + page + "/index.html", "_blank"); }
+      E.querySelectorAll("[data-dk]").forEach(function (b) { b.onclick = function () { give("sql", "sql-checker", pg.datalinks[+b.getAttribute("data-dk")]); }; });
+      E.querySelectorAll("[data-df]").forEach(function (b) { b.onclick = function () { give("ebsfix", "ebs-fixer", pg.datalinks[+b.getAttribute("data-df")]); }; });
+      var nt; $("scNotes").addEventListener("input", function () { var v = this.value; clearTimeout(nt); nt = setTimeout(function () { sc.notes = v; touch(p); }, 400); });
+    }
+    drawList(); drawEd();
+  }
+
   function vDocs(B, p) {
     var f = forecast(p), R = rag(p, f);
     B.innerHTML = '<div class="fc"><span class="rag rag-' + R.level + '">' + R.level + '</span> ' + esc(R.why.join("; ")) + ".<br>" +
@@ -708,7 +876,7 @@
 
 
   // ---------- SQL store ----------
-  var selQ = null, qSearch = "", diskSql = {};
+  var selQ = null, qSearch = "", diskSql = {}, diskScr = {};
   function qHist(q) {
     q.hist = q.hist || [];
     var last = q.hist[q.hist.length - 1];
@@ -1067,6 +1235,8 @@
     await writeFile(sub, "README.md", toMarkdown(p));
     var qs = p.queries || [];
     if (qs.length) { var sq = await sub.getDirectoryHandle("sql", { create: true }); for (var qi = 0; qi < qs.length; qi++) { var qq = qs[qi]; if (diskSql[qq.id] !== qq.sql) { await writeFile(sq, qfile(qq) + ".sql", qq.sql || ""); diskSql[qq.id] = qq.sql; } } }
+    var scs = p.screens || [];
+    if (scs.length) { var sd = await sub.getDirectoryHandle("screens", { create: true }); for (var si = 0; si < scs.length; si++) { var key = scs[si].id + scs[si].updated; if (diskScr[scs[si].id] !== key) { await writeFile(sd, sfile(scs[si]) + ".uafx", scs[si].xml || ""); diskScr[scs[si].id] = key; } } }
     var ds = p.diagrams || [];
     if (ds.length) {
       var dd = await sub.getDirectoryHandle("diagrams", { create: true }), keep = {};
@@ -1183,6 +1353,7 @@
         if (await ghPut(ghPath(p, "project.json"), JSON.stringify(p, null, 2), msg)) n++;
         await ghPut(ghPath(p, "README.md"), toMarkdown(p), msg);
         for (var qj = 0; qj < (p.queries || []).length; qj++) { var qx = p.queries[qj]; await ghPut(ghPath(p, "sql/" + qfile(qx) + ".sql"), qx.sql || "", msg); }
+        for (var sj = 0; sj < (p.screens || []).length; sj++) { var sx = p.screens[sj]; await ghPut(ghPath(p, "screens/" + sfile(sx) + ".uafx"), sx.xml || "", msg); }
         for (var j = 0; j < (p.diagrams || []).length; j++) { var dg = p.diagrams[j], fn = dfile(dg); if (dg.svg) await ghPut(ghPath(p, "diagrams/" + fn + ".svg"), dg.svg, msg); await ghPut(ghPath(p, "diagrams/" + fn + ".flow.json"), JSON.stringify({ bitkFlow: 1, doc: dg.doc }, null, 1), msg); }
       }
       var at = new Date().toISOString(); list.forEach(function (x) { x.ghAt = at; });
@@ -1318,15 +1489,17 @@
   var seeded = false; try { seeded = !!localStorage.getItem("bitk.projects.seeded"); localStorage.setItem("bitk.projects.seeded", "1"); } catch (e) {}
   if (!Object.keys(db.projects).length && !seeded) {
     var ex = fromMarkdown("# Example: Learner destinations report\n\n## Summary\nReplace the Excel destinations tracker with an SSRS report fed from EBS, so Careers and curriculum see one version.\n\n## Discovery\n- [x] Agree fields with Careers @Luke\n- [ ] Map EBS destination tables @Luke !high due:" + today() + "\n\n## Build\n- [ ] Dataset query in progress\n- [ ] Report layout and parameters\n- [ ] Publish to report server\n\n## Risks\n- Tutors enter destinations late, so early figures look low\n\n## Issues\n- No access to the careers system's database yet\n\n## Decisions\n- **" + today() + "**: Use EBS as the single source — the careers spreadsheet is retired once the report is live");
-    ex.status = "Active"; ex.owner = "Luke"; db.projects[ex.id] = ex; db.cur = ex.id; save();
+    ex.status = "Active"; ex.owner = "Luke";
+    try { var exs = addScreen(ex, "U_ExampleDestinations.uafx", exampleUafx()).sc; exs.notes = "Made-up example to show what the Screens tab reads. Remove it when you add your own."; } catch (e) {}
+    db.projects[ex.id] = ex; db.cur = ex.id; save();
   }
   render();
   window.__pp = { get db() { return db; }, fromMarkdown: fromMarkdown, toMarkdown: toMarkdown, parseQuick: parseQuick, forecast: forecast, rag: rag, DOCS: DOCS, claudePrompt: claudePrompt, aiPrompt: aiPrompt, renderFlow: renderFlow };
 })();
 </script>
-<script src="../../assets/export.js?v=202611251421"></script>
-<script src="../../assets/tools.js?v=202611251421"></script>
-<script src="../../assets/shell.js?v=202611251421"></script>
-<script src="../../assets/howto.js?v=202611251421"></script>
+<script src="../../assets/export.js?v=202611251521"></script>
+<script src="../../assets/tools.js?v=202611251521"></script>
+<script src="../../assets/shell.js?v=202611251521"></script>
+<script src="../../assets/howto.js?v=202611251521"></script>
 </body>
 </html>

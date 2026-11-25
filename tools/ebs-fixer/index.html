@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EBS Validator Fixer · BI Toolkit</title>
-<script src="../../assets/boot.js?v=202611251421"></script>
-<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251421">
-<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251421">
-<link rel="stylesheet" href="../../assets/style.css?v=202611251421">
+<script src="../../assets/boot.js?v=202611251521"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251521">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251521">
+<link rel="stylesheet" href="../../assets/style.css?v=202611251521">
 <style>
   main.wide { max-width: none; }
   .fx { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -56,7 +56,7 @@
     </div>
   </div>
 </main>
-<script src="fixer.js?v=202611251421"></script>
+<script src="fixer.js?v=202611251521"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -74,7 +74,7 @@
     "FROM PEOPLE p",
     "INNER JOIN PEOPLE_UNITS pu ON pu.PERSON_CODE = p.PERSON_CODE",
     "OUTER APPLY (SELECT TOP 1 i.INTERVIEW_DATE, i.OUTCOME",
-    "             FROM boston_main_interviews i",
+    "             FROM INTERVIEWS i",
     "             WHERE i.PERSON_CODE = p.PERSON_CODE AND i.CANCELLED = 'N'",
     "             ORDER BY i.INTERVIEW_DATE DESC) iv",
     "CROSS APPLY (SELECT COUNT(*) AS EXAM_COUNT FROM EXAM_ENTRIES e2 WHERE e2.PERSON_CODE = p.PERSON_CODE) ex",
@@ -121,8 +121,8 @@
   run();
 })();
 </script>
-<script src="../../assets/tools.js?v=202611251421"></script>
-<script src="../../assets/shell.js?v=202611251421"></script>
-<script src="../../assets/howto.js?v=202611251421"></script>
+<script src="../../assets/tools.js?v=202611251521"></script>
+<script src="../../assets/shell.js?v=202611251521"></script>
+<script src="../../assets/howto.js?v=202611251521"></script>
 </body>
 </html>

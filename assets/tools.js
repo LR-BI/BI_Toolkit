@@ -81,15 +81,21 @@ window.TOOLS = [
     tags: ["flowchart", "process", "visio", "diagram", "swimlane", "map"] },
   { cat: "Planning", icon: "PP", name: "Project Planner", path: "tools/project-planner/index.html", svg: "project-planner",
     desc: "Plan projects with tasks, a Kanban board, notes & decisions and a risks/issues log. Import plans from Markdown; save to a folder or GitHub.",
-    tags: ["project", "plan", "tasks", "kanban", "raid", "risks", "issues", "decisions", "github"] },
+    tags: ["project", "plan", "tasks", "kanban", "raid", "risks", "issues", "decisions", "github", "uafx", "screen designer", "screens"] },
   { cat: "Admin", icon: "PW", name: "Random Password Generator", path: "tools/password/index.html", svg: "password",
     desc: "Easy-to-read Colour + Animal + number + symbol passwords, one at a time or in a batch.",
     tags: ["accounts", "password"] }
 ];
 
 // ---- Version and changelog (newest first). Bump BITK_VERSION and add an entry for each release. ----
-window.BITK_VERSION = "1.1.2";
+window.BITK_VERSION = "1.2.0";
 window.CHANGELOG = [
+  { v: "1.2.0", date: "25 Nov 2026", title: "Screens in projects", items: [
+    "Project Planner: new Screens tab for Screen Designer exports (.uafx): page versions, DataLinks, layout, custom HTML and notes",
+    "Checks each screen for validator problems, hard-coded dates, expander columns, writeback tables and access groups",
+    "Send a DataLink to the SQL store, SQL Checker or EBS Validator Fixer; screens save as screens/*.uafx to a folder or GitHub",
+    "Example project has a made-up screen to show what it reads (no real screens in the site)"
+  ] },
   { v: "1.1.2", date: "25 Nov 2026", title: "Fix: delete diagram", items: [
     "Flowchart Builder: Delete this diagram works (it used to come straight back)"
   ] },
