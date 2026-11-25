@@ -42,6 +42,11 @@ No server needed: unzip or clone, then double-click `index.html`. Links use `ind
 | Academic Year & ILR Dates | `tools/fe-dates/` |
 | Excel to SSRS Width Converter | `tools/excel-to-ssrs/` |
 | Flowchart Builder | `tools/flowchart/` | Process maps with swimlanes; build from text; export SVG/PDF/PNG/Mermaid |
+| Project Planner | `tools/project-planner/` | Tasks, Kanban board, notes & decisions, risks/issues; Markdown import/export; save to a folder or GitHub |
+| SQL Notes Block | `tools/sql-notes/` | Standard header block for queries: title, dated change log, notes; suggests lines from the SQL |
+| EBS Validator Fixer | `tools/ebs-fixer/` | Rewrites OUTER/CROSS APPLY (scalar subqueries or joins) and STRING_AGG (STUFF FOR XML PATH) for the EBS Central validator |
+| Safe Change Script | `tools/safe-change/` | Preview, backup table, transaction, row-count check, dry run, log and undo for UPDATE/DELETE/INSERT |
+| Ontrack Page Builder | `tools/ontrack-builder/` | Rule-based CustomHTML script for Screen Designer pages, with F12 helpers, test plan and checklist |
 | Random Password Generator | `tools/password/` |
 | Schema Map | `tools/schema-map/` |
 | SQL Checker | `tools/sql-checker/` |

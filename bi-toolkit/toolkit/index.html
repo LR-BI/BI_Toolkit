@@ -6,12 +6,13 @@
 <title>BI Toolkit</title>
 <script src="assets/boot.js"></script>
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <section class="home-hero">
   <div class="in">
-    <div class="wordmark">BI Toolkit</div>
+    <div class="wordmark-wrap"><div class="wordmark">BI Toolkit</div></div>
     <div class="omni" id="omni">
       <input id="homebox" type="search" placeholder="Drop a file, search for a tool, paste in SQL" aria-label="Search tools, or paste text" autocomplete="off">
       <div class="acts">
@@ -27,7 +28,7 @@
 <main>
   <details class="howto"><summary>How to use</summary>
     <ol>
-      <li>Pick a tool from the list on the left or the tiles below. Ctrl+K jumps to search.</li>
+      <li>Pick a tool from the list on the left or the tiles below. Click a group's heading to open or close it; the page remembers. Ctrl+K jumps to search.</li>
       <li>Or drop a file on the box above: a <code>.sqlplan</code> opens in the plan reader, an <code>.rdl</code> in the SSRS Report Inspector, <code>.xoml</code>/<code>.xaml</code>/<code>.rules</code> in the workflow viewer, <code>.sql</code> in the SQL Checker. Pasting a query does the same.</li>
       <li>Each tool has its own "How to use" box like this one; open it when you need it. The theme button at the top right switches between light, dark and auto.</li>
     </ol>
@@ -35,7 +36,8 @@
   <div class="tagline">Small tools for SQL Server, EBS, ILR and SSRS work.</div>
   <div class="small-print">No logins, no tracking, nothing uploaded. Everything runs in your browser, so it's safe for live data.</div>
 
-  <div class="band"><div class="bh" id="bandHead">All tools</div><div class="tools" id="grid"></div></div>
+  <div class="bandbar"><span class="lbl" id="bandHead">All tools</span><button id="openAll">Open all</button><button id="closeAll">Close all</button></div>
+  <div id="grid"></div>
   <p class="empty" id="empty" hidden>No tools match. Press Enter to check it as SQL instead.</p>
 </main>
 <footer>Source: <a href="https://github.com/lr-bi/lr-bi.github.io">github.com/lr-bi/lr-bi.github.io</a></footer>
@@ -46,15 +48,34 @@
   var tools = window.TOOLS || [], cats = window.CATEGORIES || [];
   var $ = function (id) { return document.getElementById(id); };
   var box = $("homebox"), grid = $("grid"), msg = $("omsg");
-  function pathOf(key) { return { plan: "tools/plan-reader/index.html", wf: "tools/workflow-viewer/index.html", sql: "tools/sql-checker/index.html", rdl: "tools/rdl-inspector/index.html", flow: "tools/flowchart/index.html" }[key]; }
+  function pathOf(key) { return { plan: "tools/plan-reader/index.html", wf: "tools/workflow-viewer/index.html", sql: "tools/sql-checker/index.html", rdl: "tools/rdl-inspector/index.html", flow: "tools/flowchart/index.html", project: "tools/project-planner/index.html" }[key]; }
 
+  var OPEN = "bitk.home.closed", closed = {};
+  try { closed = JSON.parse(localStorage.getItem(OPEN) || "{}") || {}; } catch (e) {}
+  function keep() { try { localStorage.setItem(OPEN, JSON.stringify(closed)); } catch (e) {} }
+  function section(title, count, key, open) {
+    var d = document.createElement("details"); d.className = "band"; d.open = open; if (key) d.setAttribute("data-cat", key);
+    var s = document.createElement("summary"); s.className = "bh";
+    s.innerHTML = '<span class="chev" aria-hidden="true">&#9654;</span><span class="nm"></span><span class="n"></span>';
+    s.querySelector(".nm").textContent = title; s.querySelector(".n").textContent = count + " tool" + (count === 1 ? "" : "s");
+    var g = document.createElement("div"); g.className = "tools";
+    d.appendChild(s); d.appendChild(g); grid.appendChild(d);
+    if (key) d.addEventListener("toggle", function () { if (d.open) delete closed[key]; else closed[key] = 1; keep(); });
+    return g;
+  }
   function render() {
-    var q = box.value.trim().toLowerCase(), n = 0;
+    var q = box.value.trim().toLowerCase(), n = 0, flat = null;
     grid.innerHTML = "";
+    $("openAll").hidden = $("closeAll").hidden = !!q;
     cats.forEach(function (c, ci) {
-      tools.filter(function (t) { return t.cat === c; }).forEach(function (t) {
+      var list = tools.filter(function (t) {
+        if (t.cat !== c) return false;
         var hay = (t.name + " " + t.desc + " " + t.cat + " " + (t.tags || []).join(" ")).toLowerCase();
-        if (q && hay.indexOf(q) < 0) return;
+        return !q || hay.indexOf(q) >= 0;
+      });
+      if (!list.length) return;
+      var g = q ? (flat = flat || section("Matching tools", 0, null, true)) : section(c, list.length, c, !closed[c]);
+      list.forEach(function (t) {
         n++;
         var a = document.createElement("a"); a.className = "tool"; a.href = t.path;
         var ic = document.createElement("span"); ic.className = "ic c" + ((ci % 4) + 1); ic.setAttribute("aria-hidden", "true");
@@ -63,9 +84,10 @@
         var nm = document.createElement("div"); nm.className = "t"; nm.textContent = t.name;
         var d = document.createElement("div"); d.className = "d"; d.textContent = t.desc;
         var k = document.createElement("div"); k.className = "k"; k.textContent = t.cat;
-        a.appendChild(ic); a.appendChild(nm); a.appendChild(d); a.appendChild(k); grid.appendChild(a);
+        a.appendChild(ic); a.appendChild(nm); a.appendChild(d); if (q) a.appendChild(k); g.appendChild(a);
       });
     });
+    if (flat) { var ns = grid.querySelector(".band .n"); if (ns) ns.textContent = n + " tool" + (n === 1 ? "" : "s"); }
     $("bandHead").textContent = q ? n + " matching tool" + (n === 1 ? "" : "s") : "All tools";
     $("empty").hidden = n > 0;
   }
@@ -76,6 +98,7 @@
     if (/\.sqlplan$/.test(name) || /<ShowPlanXML/i.test(t)) return "plan";
     if (/\.rdlc?$/.test(name) || /<Report\b[^>]*reportdefinition/i.test(t)) return "rdl";
     if (/\.(xoml|xaml|rules)$/.test(name) || /<(SequentialWorkflowActivity|StateMachineWorkflowActivity|RuleDefinitions|Activity)\b/.test(t) || /schemas\.microsoft\.com\/(winfx\/2006\/xaml\/workflow|netfx\/2009\/xaml\/activities)/.test(t)) return "wf";
+    if (/\.project\.json$/.test(name) || /"bitkProject"\s*:\s*1/.test(t)) return "project";
     if (/\.flow\.json$/.test(name) || /^\s*\{\s*"bitkFlow"/.test(t)) return "flow";
     if (/\.sql$/.test(name) || /^\s*(--|\/\*|SELECT\b|WITH\b|UPDATE\b|INSERT\b|DELETE\b|DECLARE\b|MERGE\b|CREATE\b|ALTER\b|EXEC\b|IF\b|SET\b|USE\b)/i.test(t)) return "sql";
     return null;
@@ -110,6 +133,9 @@
   }
 
   box.addEventListener("input", render);
+  function setAll(open) { grid.querySelectorAll("details.band[data-cat]").forEach(function (d) { d.open = open; }); }
+  $("openAll").addEventListener("click", function () { setAll(true); });
+  $("closeAll").addEventListener("click", function () { setAll(false); });
   box.addEventListener("keydown", function (e) {
     if (e.key !== "Enter") return;
     var v = box.value.trim(); if (!v) return;

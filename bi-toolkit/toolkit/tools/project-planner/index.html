@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Planner · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  main.wide { max-width: none; }
+  .pp-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0 12px; }
+  .pp-bar .sep { width: 1px; height: 26px; background: var(--border); margin: 0 4px; }
+  .pp-bar button { min-height: 0; padding: 5px 10px; font-size: 13px; }
+  .pp-sync { font-size: 12px; color: var(--muted); margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pp-sync .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--border); margin-right: 4px; vertical-align: 1px; }
+  .pp-sync .dot.on { background: #2e9e5b; } .pp-sync .dot.warn { background: #d9a325; } .pp-sync .dot.err { background: var(--danger); }
+  .pp { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .pp-list { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); padding: 6px; position: sticky; top: 70px; max-height: calc(100vh - 100px); overflow: auto; }
+  .pp-list .pi { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; min-height: 0; cursor: pointer; color: var(--text); }
+  .pp-list .pi:hover { background: var(--bg); }
+  .pp-list .pi.on { background: var(--accent); color: var(--accent-text); }
+  .pp-list .pi .nm { font-weight: 600; font-size: 14px; display: block; }
+  .pp-list .pi .sb { font-size: 12px; opacity: .8; }
+  .pp-list .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 8px 10px 4px; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 14px; flex-wrap: wrap; }
+  .tabs button { border: 0; border-bottom: 2px solid transparent; background: none; border-radius: 0; padding: 8px 14px; min-height: 0; font-size: 14px; color: var(--muted); }
+  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  .tabs .n { font-size: 11px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+  .ph { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .ph h2 { margin: 0; font-size: 22px; }
+  .chip { display: inline-block; font-size: 12px; border-radius: 999px; padding: 1px 9px; border: 1px solid var(--border); background: var(--panel); white-space: nowrap; }
+  .st-Planning { background: #e5e9f7; color: #1f3a7a; border-color: #c5cff0; }
+  .st-Active { background: #dff2e6; color: #1d5e36; border-color: #bfe3cc; }
+  .st-On.hold, .st-Onhold { background: #fbeed3; color: #6b4a07; border-color: #f0d9a8; }
+  .st-Done { background: #ece9f3; color: #4a4560; border-color: #d9d4e8; }
+  :root[data-theme=dark] .st-Planning { background: #1d2a4d; color: #b8c8f5; border-color: #2c3d6b; }
+  :root[data-theme=dark] .st-Active { background: #163a26; color: #a6e0bc; border-color: #225338; }
+  :root[data-theme=dark] .st-Onhold { background: #40300a; color: #f2d39a; border-color: #5a4512; }
+  :root[data-theme=dark] .st-Done { background: #2a2540; color: #bdb6d8; border-color: #3a3356; }
+  .pr-High { color: var(--danger); font-weight: 700; } .pr-Low { color: var(--muted); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 12px 0; }
+  .card { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; background: var(--panel); }
+  .card .k { font-size: 12px; color: var(--muted); } .card .v { font-size: 22px; font-weight: 700; margin-top: 2px; }
+  .bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 8px; } .bar > i { display: block; height: 100%; background: var(--accent-2); }
+  .md { line-height: 1.55; } .md h1, .md h2, .md h3 { margin: .6em 0 .3em; } .md p { margin: .4em 0; } .md ul { margin: .3em 0 .3em 1.2em; padding: 0; }
+  .md code { font-family: var(--mono); font-size: 90%; background: var(--panel); padding: 0 3px; border-radius: 3px; }
+  table.pt { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.pt th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 6px 8px; cursor: pointer; user-select: none; white-space: nowrap; }
+  table.pt td { border-bottom: 1px solid var(--border); padding: 7px 8px; vertical-align: top; }
+  table.pt tr.trow { cursor: pointer; } table.pt tr.trow:hover td { background: var(--panel); }
+  table.pt tr.done td { color: var(--muted); } table.pt tr.done .tt { text-decoration: line-through; }
+  .late { color: var(--danger); font-weight: 600; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .filters select, .filters input { min-height: 0; padding: 4px 8px; font-size: 13px; }
+  .quick { display: flex; gap: 6px; margin-bottom: 12px; } .quick input { flex: 1; }
+  .board { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 10px; overflow-x: auto; }
+  .col { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; min-height: 260px; }
+  .col.over { outline: 2px dashed var(--accent); }
+  .col h3 { font-size: 13px; margin: 2px 4px 8px; display: flex; justify-content: space-between; }
+  .kc { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 7px; cursor: grab; font-size: 14px; }
+  .kc:hover { border-color: var(--accent-2); }
+  .kc .m { font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .kc.dragging { opacity: .4; }
+  .col .add { width: 100%; min-height: 0; padding: 4px; font-size: 13px; background: none; border: 1px dashed var(--border); color: var(--muted); }
+  .note { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; background: var(--bg); }
+  .note .nh { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .note .nh b { color: var(--text); font-size: 15px; }
+  .note .acts { margin-left: auto; } .note .acts button { min-height: 0; padding: 2px 8px; font-size: 12px; }
+  .k-decision { background: #e9e3ff; color: #3b2490; border-color: #d4c9ff; } .k-meeting { background: #e0eefc; color: #1c4b7a; border-color: #c3dcf5; }
+  :root[data-theme=dark] .k-decision { background: #2e176d; color: #d9d0ff; border-color: #44299a; } :root[data-theme=dark] .k-meeting { background: #16314d; color: #b6d6f5; border-color: #23476e; }
+  .sc { display: inline-block; min-width: 26px; text-align: center; border-radius: 4px; font-weight: 700; padding: 0 4px; }
+  .sc-hi { background: #f6d2d2; color: #7a1717; } .sc-md { background: #fbe8c4; color: #6b4a07; } .sc-lo { background: #d9efe1; color: #1d5e36; }
+  dialog.pp-dlg { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); width: min(680px, 94vw); padding: 18px 20px; }
+  dialog.pp-dlg::backdrop { background: rgba(10, 6, 25, .45); }
+  dialog.pp-dlg h2 { margin: 0 0 12px; font-size: 18px; }
+  .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .fg .full { grid-column: 1 / -1; }
+  .fg label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .fg input, .fg select, .fg textarea { width: 100%; box-sizing: border-box; }
+  .fg textarea { min-height: 90px; font-family: var(--ui); }
+  .dlg-acts { display: flex; gap: 8px; margin-top: 16px; } .dlg-acts .sp { flex: 1; }
+  .docs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .docs textarea { width: 100%; box-sizing: border-box; min-height: 560px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; }
+  .docs .prev { border: 1px solid var(--border); border-radius: 8px; padding: 6px 18px; background: var(--bg); overflow: auto; }
+  .docs .prev table { font-size: 13px; } .docs .prev td, .docs .prev th { border-bottom: 1px solid var(--border); padding: 4px 6px; text-align: left; }
+  .doctypes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .doctypes button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .fc { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; background: var(--panel); font-size: 14px; }
+  .rag { display: inline-block; padding: 1px 10px; border-radius: 999px; font-weight: 700; font-size: 13px; }
+  .rag-Green { background: #d9efe1; color: #1d5e36; } .rag-Amber { background: #fbe8c4; color: #6b4a07; } .rag-Red { background: #f6d2d2; color: #7a1717; }
+  @media (max-width: 1100px) { .docs { grid-template-columns: minmax(0, 1fr); } }
+  .sqlw { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .qlist { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); padding: 6px; max-height: 640px; overflow: auto; }
+  .qlist input { width: 100%; box-sizing: border-box; margin-bottom: 6px; min-height: 0; padding: 5px 8px; font-size: 13px; }
+  .qi { display: block; width: 100%; text-align: left; border: 0; background: none; border-radius: 6px; padding: 7px 9px; min-height: 0; color: var(--text); cursor: pointer; }
+  .qi:hover { background: var(--bg); } .qi.on { background: var(--accent); color: var(--accent-text); }
+  .qi b { display: block; font-size: 13.5px; } .qi span { font-size: 12px; opacity: .8; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qed .fg { margin-bottom: 8px; } .qed .fg textarea { min-height: 44px; }
+  .qed textarea.sqlbox { width: 100%; box-sizing: border-box; min-height: 340px; font-family: var(--mono); font-size: 13px; line-height: 1.45; tab-size: 4; white-space: pre; overflow-x: auto; }
+  .qbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 8px 0; } .qbar button, .qbar select { min-height: 0; padding: 4px 9px; font-size: 13px; }
+  .qbar .saved { font-size: 12px; color: var(--muted); margin-left: auto; }
+  @media (max-width: 900px) { .sqlw { grid-template-columns: minmax(0, 1fr); } }
+  .dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .dcard { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+  .dcard .img { background: #fff; height: 220px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); cursor: zoom-in; }
+  .dcard .img img { max-width: 100%; max-height: 100%; display: block; }
+  .dcard .dt { padding: 8px 12px; } .dcard .dt b { display: block; } .dcard .acts { padding: 0 12px 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .dcard .acts button { min-height: 0; padding: 3px 9px; font-size: 12.5px; }
+  dialog.pp-big { width: min(1200px, 96vw); } dialog.pp-big .img { background: #fff; text-align: center; max-height: 78vh; overflow: auto; } dialog.pp-big img { max-width: 100%; }
+  .empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
+  .hint { font-size: 12.5px; color: var(--muted); }
+  @media (max-width: 900px) { .pp { grid-template-columns: minmax(0, 1fr); } .pp-list { position: static; max-height: none; } .fg { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main class="wide">
+  <h1>Project Planner</h1>
+  <p class="lead">Plan and track projects: tasks on a board, notes and decisions, and a risks &amp; issues log. Saved in this browser, and to a folder on your PC (for example inside a GitHub repo) or straight to GitHub.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li><strong>New project</strong>, or <strong>Import Markdown</strong> to paste a plan (for example one written in a Claude chat). Headings become phases, <code>- [ ] item</code> lines become tasks, and sections called <em>Risks</em>, <em>Issues</em>, <em>Decisions</em> or <em>Notes</em> go to the right place.</li>
+      <li>Quick-add tasks with shortcuts: <code>Write ILR return query @Luke !high due:2026-12-01 #Build</code> (owner, priority, due date, phase).</li>
+      <li><strong>Board</strong>: drag cards between To do, Doing, Blocked and Done. Click any task, note or risk to edit it.</li>
+      <li><strong>Write-ups</strong> drafts a status update, project brief, closure report or README from the project: red/amber/green status with reasons, and a finish-date forecast based on how fast tasks have actually been getting done. Edit it, then copy, download or save it into the project's <code>docs</code> folder (or GitHub). <em>Copy prompt</em> wraps the project data into a prompt for Claude, ChatGPT, Copilot, Gemini or any other AI chat; tick <em>Short version</em> if a tool says it's too long.</li>
+      <li><strong>SQL</strong>: keep the project's queries together, with a database, tags and a description. Send one to the SQL Checker or Query ERD in a click, or use <em>Save to project</em> in the SQL Checker. History keeps earlier versions. Saved to the folder / GitHub as <code>sql/*.sql</code>; if you edit or add .sql files there (SSMS, VS Code, git pull), <em>Reload from folder</em> brings the changes in.</li>
+      <li><strong>Diagrams</strong>: attach process maps from the <a href="../flowchart/index.html">Flowchart Builder</a> (or use <em>Add to project…</em> there). They stay linked, so edits in the builder show up here; they're saved with the project as <code>diagrams/*.svg</code> and <code>.flow.json</code>, shown in the README, and included in AI prompts as Mermaid text.</li>
+      <li><strong>Copy as Markdown</strong> gives you the whole project as text to paste back into a chat, email or README.</li>
+      <li><strong>Save to a folder</strong> (Chrome or Edge): pick a folder once, e.g. a <code>projects</code> folder inside a GitHub repo on your PC. Every change is written there as <code>project.json</code> plus a readable <code>README.md</code>, one subfolder per project. Commit and push with GitHub Desktop or git.</li>
+      <li><strong>Open from GitHub</strong> lists every project saved in your repo, including ones that are no longer in this browser (new PC, cleared history), and opens any of them. Each saved project gets a <strong>View on GitHub</strong> link in its header.</li>
+      <li><strong>GitHub</strong> (optional): save straight to a repo using a personal access token. This is the only part of the toolkit that talks to the internet, and only when you click it. Use a fine-grained token limited to one repo with <em>Contents: read and write</em>.</li>
+      <li>Everything also saves in this browser automatically. Use <strong>Export file</strong> for a backup or to move to another PC.</li>
+    </ol>
+  </details>
+
+  <div class="pp-bar">
+    <button id="newBtn" class="primary">New project</button>
+    <button id="mdBtn">Import Markdown</button>
+    <button id="copyMd">Copy as Markdown</button>
+    <span class="sep"></span>
+    <button id="exportBtn">Export file</button>
+    <button id="importBtn">Import file</button>
+    <input type="file" id="importFile" accept=".json,application/json" multiple hidden>
+    <span class="sep"></span>
+    <button id="folderBtn">Save to a folder</button>
+    <button id="ghBtn">GitHub…</button>
+    <button id="ghOpen" title="See every project saved in your GitHub repo and open any of them here">Open from GitHub</button>
+    <div class="pp-sync"><span id="folderState"></span><span id="ghState"></span></div>
+  </div>
+
+  <div class="pp">
+    <nav class="pp-list" id="plist" aria-label="Projects"></nav>
+    <section id="pane"></section>
+  </div>
+
+  <dialog class="pp-dlg" id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var STORE = "bitk.projects.v1", GHCFG = "bitk.projects.github";
+  var STATUSES = ["Planning", "Active", "On hold", "Done"];
+  var TSTAT = [["todo", "To do"], ["doing", "Doing"], ["blocked", "Blocked"], ["done", "Done"]];
+  var PRI = ["High", "Medium", "Low"];
+  var RAIDT = ["Risk", "Assumption", "Issue", "Dependency"];
+  var NKIND = [["note", "Note"], ["meeting", "Meeting"], ["decision", "Decision"]];
+
+  var db = { cur: null, projects: {} }, tab = "overview", sortT = { k: "status", d: 1 }, fT = { status: "", owner: "", phase: "", q: "" }, fR = "";
+  function today() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function id(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function slug(s) { return String(s || "project").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "project"; }
+  function fmtDate(d) { if (!d) return ""; var p = d.split("-"); return p.length === 3 ? +p[2] + " " + ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+p[1] - 1] + " " + p[0] : d; }
+  function late(t) { return t.due && t.status !== "done" && t.due < today(); }
+  function qname(q) { return q.file || slug(q.name || "query") + "-" + q.id.slice(-4); } // preview only; fixed on first save
+  function qfile(q) { if (!q.file) q.file = slug(q.name || "query") + "-" + q.id.slice(-4); return q.file; }
+  function dfile(d) { if (!d.file) d.file = slug(d.name) + "-" + d.id.slice(-4); return d.file; }
+  function blank(name) {
+    return { bitkProject: 1, id: id("p"), name: name || "New project", status: "Planning", owner: "", start: today(), due: "", summary: "", folder: "",
+      tasks: [], notes: [], raid: [], created: new Date().toISOString(), updated: new Date().toISOString() };
+  }
+  function P() { return db.projects[db.cur]; }
+
+  // ---------- browser storage ----------
+  function load() {
+    try { var s = JSON.parse(localStorage.getItem(STORE) || "null"); if (s && s.projects) db = s; } catch (e) {}
+    if (!db.cur || !db.projects[db.cur]) db.cur = Object.keys(db.projects)[0] || null;
+  }
+  var saveT, dirty = {};
+  function touch(p) {
+    p = p || P(); if (!p) return; p.updated = new Date().toISOString(); dirty[p.id] = 1;
+    var h = p.history = p.history || [], d = today(), done = p.tasks.filter(function (t) { return t.status === "done"; }).length, last = h[h.length - 1];
+    if (last && last.d === d) { last.done = done; last.total = p.tasks.length; } else h.push({ d: d, done: done, total: p.tasks.length });
+    if (h.length > 400) h.splice(0, h.length - 400);
+    save();
+  }
+  function save() {
+    try { localStorage.setItem(STORE, JSON.stringify(db)); } catch (e) { alert("Couldn't save in this browser (storage full?). Export a file as a backup."); }
+    clearTimeout(saveT); saveT = setTimeout(flushFolder, 700);
+  }
+
+  // ---------- Markdown out ----------
+  function toMarkdown(p) {
+    var L = ["# " + p.name, ""];
+    L.push("**Status:** " + p.status + (p.owner ? " · **Owner:** " + p.owner : "") + (p.start ? " · **Start:** " + p.start : "") + (p.due ? " · **Due:** " + p.due : ""), "");
+    if (p.summary) L.push(p.summary.trim(), "");
+    var done = p.tasks.filter(function (t) { return t.status === "done"; }).length;
+    L.push("## Tasks (" + done + "/" + p.tasks.length + " done)", "");
+    var phases = []; p.tasks.forEach(function (t) { if (phases.indexOf(t.phase || "") < 0) phases.push(t.phase || ""); });
+    phases.forEach(function (ph) {
+      if (ph) L.push("### " + ph, "");
+      p.tasks.filter(function (t) { return (t.phase || "") === ph; }).forEach(function (t) {
+        var bits = []; if (t.status === "doing") bits.push("in progress"); if (t.status === "blocked") bits.push("BLOCKED"); if (t.owner) bits.push("@" + t.owner); if (t.priority && t.priority !== "Medium") bits.push("!" + t.priority.toLowerCase()); if (t.due) bits.push("due:" + t.due);
+        L.push("- [" + (t.status === "done" ? "x" : " ") + "] " + t.title + (bits.length ? " " + bits.join(" ") : ""));
+        if (t.notes) t.notes.split("\n").forEach(function (l) { if (l.trim()) L.push("  " + l); });
+      });
+      L.push("");
+    });
+    if (p.raid.length) {
+      L.push("## Risks & issues", "", "| Type | Item | Impact | Likelihood | Owner | Status | Action |", "|---|---|---|---|---|---|---|");
+      p.raid.forEach(function (r) { L.push("| " + [r.type, r.title, r.impact, r.likelihood, r.owner, r.status, r.action].map(function (x) { return String(x == null ? "" : x).replace(/\|/g, "/").replace(/\n/g, " "); }).join(" | ") + " |"); });
+      L.push("");
+    }
+    var dec = p.notes.filter(function (n) { return n.kind === "decision"; }), other = p.notes.filter(function (n) { return n.kind !== "decision"; });
+    if (dec.length) { L.push("## Decisions", ""); dec.forEach(function (n) { L.push("- **" + n.date + "**: " + n.title + (n.body ? " — " + n.body.replace(/\n+/g, " ") : "")); }); L.push(""); }
+    if (other.length) { L.push("## Notes", ""); other.forEach(function (n) { L.push("### " + n.date + " · " + n.title + (n.kind === "meeting" ? " (meeting)" : ""), "", n.body || "", ""); }); }
+    if ((p.queries || []).length) { L.push("## SQL", ""); p.queries.forEach(function (q) { L.push("- [" + q.name + "](sql/" + qfile(q) + ".sql)" + (q.db ? " · " + q.db : "") + (q.desc ? ": " + q.desc.replace(/\n+/g, " ") : "")); }); L.push(""); }
+    if ((p.diagrams || []).length) { L.push("## Diagrams", ""); p.diagrams.forEach(function (d) { L.push("![" + d.name + "](diagrams/" + dfile(d) + ".svg)", ""); }); }
+    L.push("_Saved from BI Toolkit Project Planner, " + new Date().toISOString().slice(0, 16).replace("T", " ") + "_");
+    return L.join("\n");
+  }
+
+  // ---------- Markdown in ----------
+  function parseQuick(s) {
+    var t = { title: s, owner: "", priority: "Medium", due: "", phase: "" }, m;
+    s = s.replace(/\s@([\w.'-]+)/, function (_, o) { t.owner = o; return ""; });
+    s = s.replace(/\s!(high|h|medium|med|m|low|l)\b/i, function (_, p) { p = p[0].toLowerCase(); t.priority = p === "h" ? "High" : p === "l" ? "Low" : "Medium"; return ""; });
+    s = s.replace(/\sdue:(\d{4}-\d{2}-\d{2})/i, function (_, d) { t.due = d; return ""; });
+    s = s.replace(/\s#([\w-]+)/, function (_, ph) { t.phase = ph.replace(/-/g, " "); return ""; });
+    if ((m = /\s(in progress|BLOCKED)\s*$/i.exec(s))) { t.status = /block/i.test(m[1]) ? "blocked" : "doing"; s = s.slice(0, m.index); }
+    t.title = s.trim(); return t;
+  }
+  function fromMarkdown(md) {
+    var p = blank("Imported plan"), section = "", phase = "", lines = md.replace(/\r/g, "").split("\n"), summary = [], gotTitle = false, lastTask = null, noteBuf = null;
+    function flushNote() { if (noteBuf) { noteBuf.body = noteBuf.body.trim(); p.notes.push(noteBuf); noteBuf = null; } }
+    lines.forEach(function (raw) {
+      var line = raw.replace(/\s+$/, ""), m;
+      if ((m = /^#\s+(.+)/.exec(line)) && !gotTitle) { p.name = m[1].trim(); gotTitle = true; return; }
+      if ((m = /^(#{1,4})\s+(.+)/.exec(line))) {
+        flushNote(); lastTask = null;
+        var h = m[2].replace(/\(.*?\)\s*$/, "").trim(), hl = h.toLowerCase();
+        if (/^(risks?|issues?|raid|risks?\s*(&|and)\s*issues?|assumptions?|dependenc)/.test(hl)) { section = "raid:" + (/issue/.test(hl) && !/risk/.test(hl) ? "Issue" : /assum/.test(hl) ? "Assumption" : /depend/.test(hl) ? "Dependency" : "Risk"); return; }
+        if (/^diagrams?$|^sql$|^queries$|^sql queries$/.test(hl)) { section = "skip"; return; }
+        if (/^decisions?/.test(hl)) { section = "decision"; return; }
+        if (/^(notes?|meeting)/.test(hl)) { section = "notes"; return; }
+        if (/^(summary|overview|goal|goals|background|scope|aim|aims|objective)/.test(hl)) { section = "summary"; return; }
+        if (/^tasks?$|^actions?$|^to ?do$|^plan$|^next steps$/.test(hl)) { section = "tasks"; phase = ""; return; }
+        if (section === "notes" && m[1].length >= 3) { noteBuf = { id: id("n"), date: (/\d{4}-\d{2}-\d{2}/.exec(h) || [today()])[0], kind: /meeting/i.test(h) ? "meeting" : "note", title: h.replace(/\d{4}-\d{2}-\d{2}\s*·?\s*/, "").replace(/\(meeting\)/i, "").trim() || "Note", body: "" }; return; }
+        section = "tasks"; phase = h; return;
+      }
+      if (/^\*\*Status:\*\*/.test(line)) {
+        var st = /\*\*Status:\*\*\s*([^·]+)/.exec(line), ow = /\*\*Owner:\*\*\s*([^·]+)/.exec(line), sd = /\*\*Start:\*\*\s*([\d-]+)/.exec(line), dd = /\*\*Due:\*\*\s*([\d-]+)/.exec(line);
+        if (st && STATUSES.indexOf(st[1].trim()) >= 0) p.status = st[1].trim(); if (ow) p.owner = ow[1].trim(); if (sd) p.start = sd[1]; if (dd) p.due = dd[1]; return;
+      }
+      if (/^_Saved from BI Toolkit/.test(line)) return;
+      if (section.indexOf("raid") === 0) {
+        if ((m = /^\|(.+)\|$/.exec(line))) {
+          var c = m[1].split("|").map(function (x) { return x.trim(); });
+          if (/^-+$/.test(c[0].replace(/:/g, "")) || /^type$/i.test(c[0])) return;
+          if (c.length >= 2) p.raid.push({ id: id("r"), type: RAIDT.indexOf(c[0]) >= 0 ? c[0] : section.split(":")[1], title: c[1], impact: +c[2] || 2, likelihood: +c[3] || 2, owner: c[4] || "", status: c[5] === "Closed" ? "Closed" : "Open", action: c[6] || "", detail: "", date: today() });
+          return;
+        }
+        if ((m = /^\s*[-*+]\s+(?:\[[ xX]\]\s*)?(.+)/.exec(line))) { p.raid.push({ id: id("r"), type: section.split(":")[1], title: m[1].trim(), impact: 2, likelihood: 2, owner: "", status: "Open", action: "", detail: "", date: today() }); return; }
+        return;
+      }
+      if (section === "decision" && (m = /^\s*[-*+]\s+(.+)/.exec(line))) {
+        var dm = /^\*\*(\d{4}-\d{2}-\d{2})\*\*:\s*(.+)$/.exec(m[1]), txt = dm ? dm[2] : m[1], parts = txt.split(" — ");
+        p.notes.push({ id: id("n"), date: dm ? dm[1] : today(), kind: "decision", title: parts[0].trim(), body: (parts[1] || "").trim() }); return;
+      }
+      if (section === "notes") {
+        if (noteBuf) { noteBuf.body += raw + "\n"; return; }
+        if ((m = /^\s*[-*+]\s+(.+)/.exec(line))) { p.notes.push({ id: id("n"), date: today(), kind: "note", title: m[1].trim().slice(0, 80), body: m[1].trim().length > 80 ? m[1].trim() : "" }); }
+        return;
+      }
+      if (section === "summary") { summary.push(raw); return; }
+      if (section === "skip") return;
+      if ((m = /^(\s*)(?:[-*+]|\d+[.)])\s+(\[([ xX])\]\s+)?(.+)/.exec(line))) {
+        if (m[1].length >= 2 && lastTask && !m[2]) { lastTask.notes = (lastTask.notes ? lastTask.notes + "\n" : "") + "- " + m[4]; return; }
+        var q = parseQuick(" " + m[4]);
+        var t = { id: id("t"), title: q.title, status: m[3] && m[3].toLowerCase() === "x" ? "done" : (q.status || "todo"), priority: q.priority, owner: q.owner, due: q.due, phase: q.phase || phase, notes: "", created: today() };
+        if (t.title) { p.tasks.push(t); lastTask = t; }
+        return;
+      }
+      if (lastTask && /^\s{2,}\S/.test(raw)) { lastTask.notes = (lastTask.notes ? lastTask.notes + "\n" : "") + raw.trim(); return; }
+      if (!section && line.trim()) summary.push(raw);
+    });
+    flushNote();
+    p.summary = summary.join("\n").trim();
+    return p;
+  }
+
+  // ---------- tiny Markdown renderer (notes, summary) ----------
+  function md(s) {
+    var out = [], list = false;
+    String(s || "").split("\n").forEach(function (l) {
+      var m, h = esc(l)
+        .replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      if ((m = /^\s*[-*+]\s+(?:\[([ xX])\]\s*)?(.*)$/.exec(h))) { if (!list) { out.push("<ul>"); list = true; } out.push("<li>" + (m[1] ? (m[1] === " " ? "☐ " : "☑ ") : "") + m[2] + "</li>"); return; }
+      if (list) { out.push("</ul>"); list = false; }
+      if (/^\s*\|.*\|\s*$/.test(h)) {
+        var cells = h.trim().replace(/^\||\|$/g, "").split("|").map(function (c) { return c.trim(); });
+        if (cells.every(function (c) { return /^:?-{2,}:?$/.test(c); })) return;
+        var prev = out[out.length - 1] || "", head = !/<\/tr>$/.test(prev) && !/^<tr>/.test(prev);
+        if (head) out.push("<table>");
+        out.push("<tr>" + cells.map(function (c) { return (head ? "<th>" : "<td>") + c + (head ? "</th>" : "</td>"); }).join("") + "</tr>");
+        return;
+      }
+      if (/<\/tr>$/.test(out[out.length - 1] || "")) out.push("</table>");
+      if (/^-{3,}$/.test(h.trim())) { out.push("<hr>"); return; }
+      if ((m = /^(#{1,4})\s+(.*)$/.exec(h))) { out.push("<h" + (m[1].length + 2) + ">" + m[2] + "</h" + (m[1].length + 2) + ">"); return; }
+      if (h.trim()) out.push("<p>" + h + "</p>");
+    });
+    if (list) out.push("</ul>");
+    if (/<\/tr>$/.test(out[out.length - 1] || "")) out.push("</table>");
+    return out.join("");
+  }
+
+  // ---------- project list ----------
+  function renderList() {
+    var L = $("plist"); L.innerHTML = "";
+    var ids = Object.keys(db.projects);
+    if (!ids.length) { L.innerHTML = '<div class="hint" style="padding:10px">No projects yet.</div>'; return; }
+    STATUSES.forEach(function (st) {
+      var ps = ids.map(function (k) { return db.projects[k]; }).filter(function (p) { return p.status === st; }).sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); });
+      if (!ps.length) return;
+      L.appendChild(Object.assign(document.createElement("div"), { className: "grp", textContent: st }));
+      ps.forEach(function (p) {
+        var b = document.createElement("button"); b.className = "pi" + (p.id === db.cur ? " on" : "");
+        var open = p.tasks.filter(function (t) { return t.status !== "done"; }).length;
+        b.innerHTML = '<span class="nm">' + esc(p.name) + '</span><span class="sb">' + open + " open task" + (open === 1 ? "" : "s") + (p.due ? " · due " + esc(fmtDate(p.due)) : "") + "</span>";
+        b.addEventListener("click", function () { db.cur = p.id; save(); render(); });
+        L.appendChild(b);
+      });
+    });
+  }
+
+  // ---------- main pane ----------
+  function render() { renderList(); renderPane(); syncState(); }
+  function renderPane() {
+    var S = $("pane"), p = P();
+    if (!p) { S.innerHTML = '<div class="empty">Start with <strong>New project</strong>, or <strong>Import Markdown</strong> to turn a plan into tasks.</div>'; return; }
+    var openT = p.tasks.filter(function (t) { return t.status !== "done"; }).length, openR = p.raid.filter(function (r) { return r.status !== "Closed"; }).length;
+    S.innerHTML = '<div class="ph"><h2>' + esc(p.name) + '</h2><span class="chip st-' + p.status.replace(/\s/g, "") + '">' + esc(p.status) + '</span>' +
+      ghLink(p) + (p.owner ? '<span class="chip">Owner: ' + esc(p.owner) + "</span>" : "") + (p.due ? '<span class="chip' + (p.due < today() && p.status !== "Done" ? " late" : "") + '">Due ' + esc(fmtDate(p.due)) + "</span>" : "") +
+      '<button id="editP" style="min-height:0;padding:3px 10px;font-size:13px">Edit details</button></div>' +
+      '<div class="tabs" role="tablist">' + [["overview", "Overview", ""], ["tasks", "Tasks", openT], ["board", "Board", ""], ["notes", "Notes & decisions", p.notes.length], ["raid", "Risks & issues", openR], ["sql", "SQL", (p.queries || []).length], ["diagrams", "Diagrams", (p.diagrams || []).length], ["docs", "Write-ups", ""]].map(function (t) {
+        return '<button data-tab="' + t[0] + '" class="' + (tab === t[0] ? "on" : "") + '">' + t[1] + (t[2] !== "" ? '<span class="n">' + t[2] + "</span>" : "") + "</button>";
+      }).join("") + '</div><div id="tabBody"></div>';
+    S.querySelectorAll("[data-tab]").forEach(function (b) { b.addEventListener("click", function () { tab = b.getAttribute("data-tab"); renderPane(); }); });
+    $("editP").addEventListener("click", editProject);
+    ({ overview: vOverview, tasks: vTasks, board: vBoard, notes: vNotes, raid: vRaid, sql: vSql, diagrams: vDiagrams, docs: vDocs })[tab]($("tabBody"), p);
+  }
+
+  function vOverview(B, p) {
+    var n = p.tasks.length, d = p.tasks.filter(function (t) { return t.status === "done"; }).length, pct = n ? Math.round(d / n * 100) : 0;
+    var lateT = p.tasks.filter(late), blocked = p.tasks.filter(function (t) { return t.status === "blocked"; });
+    var openR = p.raid.filter(function (r) { return r.status !== "Closed"; }).sort(function (a, b) { return b.impact * b.likelihood - a.impact * a.likelihood; });
+    var upcoming = p.tasks.filter(function (t) { return t.status !== "done" && t.due; }).sort(function (a, b) { return a.due.localeCompare(b.due); }).slice(0, 6);
+    var h = '<div class="cards">' +
+      card("Progress", pct + "%", '<div class="bar"><i style="width:' + pct + '%"></i></div><div class="hint" style="margin-top:6px">' + d + " of " + n + " tasks done</div>") +
+      card("Overdue tasks", lateT.length, lateT.length ? '<div class="hint late">' + esc(lateT[0].title) + (lateT.length > 1 ? " +" + (lateT.length - 1) + " more" : "") + "</div>" : '<div class="hint">None</div>') +
+      card("Blocked", blocked.length, blocked.length ? '<div class="hint">' + esc(blocked[0].title) + "</div>" : '<div class="hint">Nothing blocked</div>') +
+      card("Open risks & issues", openR.length, openR.length ? '<div class="hint">Top: ' + esc(openR[0].title) + "</div>" : '<div class="hint">None logged</div>') + "</div>";
+    h += '<h3>Summary</h3>' + (p.summary ? '<div class="md">' + md(p.summary) + "</div>" : '<p class="hint">No summary yet. Use <strong>Edit details</strong> to add goals and scope.</p>');
+    h += "<h3>Coming up</h3>" + (upcoming.length ? '<table class="pt"><tr><th>Due</th><th>Task</th><th>Owner</th><th>Status</th></tr>' + upcoming.map(function (t) {
+      return '<tr class="trow" data-t="' + t.id + '"><td class="' + (late(t) ? "late" : "") + '">' + esc(fmtDate(t.due)) + '</td><td>' + esc(t.title) + "</td><td>" + esc(t.owner) + "</td><td>" + statusLabel(t.status) + "</td></tr>";
+    }).join("") + "</table>" : '<p class="hint">No dated tasks.</p>');
+    var lastDec = p.notes.filter(function (x) { return x.kind === "decision"; }).sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 3);
+    if (lastDec.length) h += "<h3>Latest decisions</h3><ul>" + lastDec.map(function (x) { return "<li><strong>" + esc(fmtDate(x.date)) + "</strong>: " + esc(x.title) + "</li>"; }).join("") + "</ul>";
+    B.innerHTML = h;
+    B.querySelectorAll("[data-t]").forEach(function (r) { r.addEventListener("click", function () { editTask(p.tasks.filter(function (t) { return t.id === r.getAttribute("data-t"); })[0]); }); });
+  }
+  function card(k, v, extra) { return '<div class="card"><div class="k">' + k + '</div><div class="v">' + v + "</div>" + (extra || "") + "</div>"; }
+  function statusLabel(s) { var x = TSTAT.filter(function (t) { return t[0] === s; })[0]; return x ? x[1] : s; }
+  function uniq(arr) { var o = []; arr.forEach(function (x) { if (x && o.indexOf(x) < 0) o.push(x); }); return o.sort(); }
+
+  function quickBox(B, p, ph) {
+    var q = document.createElement("div"); q.className = "quick";
+    q.innerHTML = '<input type="text" placeholder="Add a task… e.g. Build fees report @Luke !high due:2026-12-05 #Build" aria-label="Add a task"><button class="primary">Add</button>';
+    var inp = q.querySelector("input");
+    function go() { var v = inp.value.trim(); if (!v) return; var t = parseQuick(" " + v); p.tasks.push({ id: id("t"), title: t.title, status: t.status || "todo", priority: t.priority, owner: t.owner, due: t.due, phase: t.phase || ph || "", notes: "", created: today() }); touch(p); render(); var n = $("tabBody").querySelector(".quick input"); if (n) n.focus(); }
+    q.querySelector("button").addEventListener("click", go);
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+    B.appendChild(q);
+  }
+  function vTasks(B, p) {
+    B.innerHTML = "";
+    quickBox(B, p);
+    var f = document.createElement("div"); f.className = "filters";
+    function sel(key, label, opts) { return '<select data-f="' + key + '"><option value="">' + label + "</option>" + opts.map(function (o) { var v = Array.isArray(o) ? o[0] : o, l = Array.isArray(o) ? o[1] : o; return '<option value="' + esc(v) + '"' + (fT[key] === v ? " selected" : "") + ">" + esc(l) + "</option>"; }).join("") + "</select>"; }
+    f.innerHTML = sel("status", "Any status", [["open", "Not done"]].concat(TSTAT)) + sel("owner", "Any owner", uniq(p.tasks.map(function (t) { return t.owner; }))) + sel("phase", "Any phase", uniq(p.tasks.map(function (t) { return t.phase; }))) +
+      '<input data-f="q" type="search" placeholder="Search" value="' + esc(fT.q) + '">';
+    B.appendChild(f);
+    f.querySelectorAll("[data-f]").forEach(function (e) { e.addEventListener(e.tagName === "INPUT" ? "input" : "change", function () { fT[e.getAttribute("data-f")] = e.value; drawT(); }); });
+    var host = document.createElement("div"); B.appendChild(host);
+    function drawT() {
+      var ord = { todo: 1, doing: 0, blocked: 2, done: 3 }, pri = { High: 0, Medium: 1, Low: 2 };
+      var rows = p.tasks.filter(function (t) {
+        if (fT.status === "open" ? t.status === "done" : fT.status && t.status !== fT.status) return false;
+        if (fT.owner && t.owner !== fT.owner) return false; if (fT.phase && t.phase !== fT.phase) return false;
+        if (fT.q && (t.title + " " + t.notes).toLowerCase().indexOf(fT.q.toLowerCase()) < 0) return false; return true;
+      });
+      var k = sortT.k;
+      rows.sort(function (a, b) {
+        var x = k === "status" ? ord[a.status] - ord[b.status] : k === "priority" ? pri[a.priority] - pri[b.priority] : k === "due" ? (a.due || "9999").localeCompare(b.due || "9999") : String(a[k] || "").localeCompare(String(b[k] || ""));
+        return x * sortT.d || ord[a.status] - ord[b.status] || (a.due || "9999").localeCompare(b.due || "9999");
+      });
+      if (!p.tasks.length) { host.innerHTML = '<div class="empty">No tasks yet. Type one above and press Enter.</div>'; return; }
+      host.innerHTML = '<table class="pt"><tr>' + [["", ""], ["title", "Task"], ["phase", "Phase"], ["owner", "Owner"], ["priority", "Priority"], ["due", "Due"], ["status", "Status"]].map(function (c) {
+        return c[0] ? '<th data-s="' + c[0] + '">' + c[1] + (sortT.k === c[0] ? (sortT.d > 0 ? " ▲" : " ▼") : "") + "</th>" : '<th style="width:28px"></th>';
+      }).join("") + "</tr>" + rows.map(function (t) {
+        return '<tr class="trow' + (t.status === "done" ? " done" : "") + '" data-t="' + t.id + '"><td><input type="checkbox" data-done="' + t.id + '"' + (t.status === "done" ? " checked" : "") + ' aria-label="Done"></td><td class="tt">' + esc(t.title) + (t.notes ? ' <span class="hint">✎</span>' : "") +
+          "</td><td>" + esc(t.phase) + "</td><td>" + esc(t.owner) + '</td><td class="pr-' + t.priority + '">' + t.priority + '</td><td class="' + (late(t) ? "late" : "") + '">' + esc(fmtDate(t.due)) + "</td><td>" + statusLabel(t.status) + "</td></tr>";
+      }).join("") + "</table>" + (rows.length < p.tasks.length ? '<p class="hint">' + (p.tasks.length - rows.length) + " hidden by filters.</p>" : "");
+      host.querySelectorAll("[data-s]").forEach(function (h) { h.addEventListener("click", function () { var k2 = h.getAttribute("data-s"); sortT = { k: k2, d: sortT.k === k2 ? -sortT.d : 1 }; drawT(); }); });
+      host.querySelectorAll("[data-done]").forEach(function (c) { c.addEventListener("click", function (e) { e.stopPropagation(); var t = p.tasks.filter(function (x) { return x.id === c.getAttribute("data-done"); })[0]; t.status = c.checked ? "done" : "todo"; if (c.checked) t.doneOn = today(); touch(p); renderList(); drawT(); }); });
+      host.querySelectorAll("tr[data-t]").forEach(function (r) { r.addEventListener("click", function () { editTask(p.tasks.filter(function (t) { return t.id === r.getAttribute("data-t"); })[0]); }); });
+    }
+    drawT();
+  }
+  function vBoard(B, p) {
+    B.innerHTML = '<div class="board">' + TSTAT.map(function (s) {
+      var ts = p.tasks.filter(function (t) { return t.status === s[0]; });
+      return '<div class="col" data-col="' + s[0] + '"><h3><span>' + s[1] + '</span><span class="hint">' + ts.length + "</span></h3>" + ts.map(function (t) {
+        return '<div class="kc" draggable="true" data-t="' + t.id + '"><div>' + esc(t.title) + '</div><div class="m">' + (t.priority !== "Medium" ? '<span class="pr-' + t.priority + '">' + t.priority + "</span>" : "") + (t.owner ? "<span>@" + esc(t.owner) + "</span>" : "") +
+          (t.due ? '<span class="' + (late(t) ? "late" : "") + '">' + esc(fmtDate(t.due)) + "</span>" : "") + (t.phase ? "<span>#" + esc(t.phase) + "</span>" : "") + "</div></div>";
+      }).join("") + '<button class="add" data-add="' + s[0] + '">+ Add</button></div>';
+    }).join("") + "</div>";
+    var dragId = null;
+    B.querySelectorAll(".kc").forEach(function (c) {
+      c.addEventListener("dragstart", function (e) { dragId = c.getAttribute("data-t"); c.classList.add("dragging"); e.dataTransfer.setData("text/plain", dragId); e.dataTransfer.effectAllowed = "move"; });
+      c.addEventListener("dragend", function () { c.classList.remove("dragging"); });
+      c.addEventListener("click", function () { editTask(p.tasks.filter(function (t) { return t.id === c.getAttribute("data-t"); })[0]); });
+    });
+    B.querySelectorAll(".col").forEach(function (col) {
+      col.addEventListener("dragover", function (e) { e.preventDefault(); col.classList.add("over"); });
+      col.addEventListener("dragleave", function () { col.classList.remove("over"); });
+      col.addEventListener("drop", function (e) {
+        e.preventDefault(); col.classList.remove("over");
+        var tid = e.dataTransfer.getData("text/plain") || dragId, t = p.tasks.filter(function (x) { return x.id === tid; })[0]; if (!t) return;
+        // drop position: before the card under the pointer
+        var after = null; col.querySelectorAll(".kc").forEach(function (k) { var r = k.getBoundingClientRect(); if (!after && e.clientY < r.top + r.height / 2 && k.getAttribute("data-t") !== tid) after = k.getAttribute("data-t"); });
+        t.status = col.getAttribute("data-col"); if (t.status === "done") t.doneOn = today();
+        p.tasks.splice(p.tasks.indexOf(t), 1);
+        var at = after ? p.tasks.indexOf(p.tasks.filter(function (x) { return x.id === after; })[0]) : p.tasks.length;
+        p.tasks.splice(at < 0 ? p.tasks.length : at, 0, t);
+        touch(p); render();
+      });
+    });
+    B.querySelectorAll("[data-add]").forEach(function (b) { b.addEventListener("click", function () { var t = { id: id("t"), title: "", status: b.getAttribute("data-add"), priority: "Medium", owner: "", due: "", phase: "", notes: "", created: today() }; editTask(t, true); }); });
+  }
+  function vNotes(B, p) {
+    B.innerHTML = '<div class="filters"><button class="primary" id="addNote">Add note</button><button id="addDec">Log a decision</button><button id="addMeet">Meeting notes</button></div><div id="nl"></div>';
+    var list = p.notes.slice().sort(function (a, b) { return b.date.localeCompare(a.date) || 0; });
+    $("nl").innerHTML = list.length ? list.map(function (n) {
+      return '<div class="note"><div class="nh"><span class="chip k-' + n.kind + '">' + (NKIND.filter(function (k) { return k[0] === n.kind; })[0] || [0, "Note"])[1] + "</span><span>" + esc(fmtDate(n.date)) + "</span><b>" + esc(n.title) + '</b><span class="acts"><button data-n="' + n.id + '">Edit</button></span></div>' + (n.body ? '<div class="md">' + md(n.body) + "</div>" : "") + "</div>";
+    }).join("") : '<div class="empty">No notes yet. Log decisions here so you can find out later why something was done.</div>';
+    function add(kind) { editNote({ id: id("n"), date: today(), kind: kind, title: "", body: "" }, true); }
+    $("addNote").addEventListener("click", function () { add("note"); }); $("addDec").addEventListener("click", function () { add("decision"); }); $("addMeet").addEventListener("click", function () { add("meeting"); });
+    B.querySelectorAll("[data-n]").forEach(function (b) { b.addEventListener("click", function () { editNote(p.notes.filter(function (n) { return n.id === b.getAttribute("data-n"); })[0]); }); });
+  }
+  function score(r) { var s = (+r.impact || 1) * (+r.likelihood || 1); return '<span class="sc ' + (s >= 6 ? "sc-hi" : s >= 3 ? "sc-md" : "sc-lo") + '">' + s + "</span>"; }
+  function vRaid(B, p) {
+    B.innerHTML = '<div class="filters"><button class="primary" id="addR">Add risk / issue</button><select id="fR"><option value="">All types</option>' + RAIDT.map(function (t) { return "<option" + (fR === t ? " selected" : "") + ">" + t + "</option>"; }).join("") +
+      '</select><span class="hint">Score = impact × likelihood (each 1–3). 6+ is high.</span></div><div id="rl"></div>';
+    var rows = p.raid.filter(function (r) { return !fR || r.type === fR; }).sort(function (a, b) { return (a.status === "Closed") - (b.status === "Closed") || b.impact * b.likelihood - a.impact * a.likelihood; });
+    $("rl").innerHTML = rows.length ? '<table class="pt"><tr><th>Type</th><th>Item</th><th>Score</th><th>Owner</th><th>Action</th><th>Status</th></tr>' + rows.map(function (r) {
+      return '<tr class="trow' + (r.status === "Closed" ? " done" : "") + '" data-r="' + r.id + '"><td>' + esc(r.type) + '</td><td class="tt">' + esc(r.title) + "</td><td>" + score(r) + "</td><td>" + esc(r.owner) + "</td><td>" + esc(r.action) + "</td><td>" + esc(r.status) + "</td></tr>";
+    }).join("") + "</table>" : '<div class="empty">Nothing logged. Add risks (might happen), issues (happening now), assumptions and dependencies.</div>';
+    $("fR").addEventListener("change", function () { fR = this.value; vRaid(B, p); });
+    $("addR").addEventListener("click", function () { editRaid({ id: id("r"), type: fR || "Risk", title: "", detail: "", impact: 2, likelihood: 2, owner: "", status: "Open", action: "", date: today() }, true); });
+    B.querySelectorAll("[data-r]").forEach(function (r) { r.addEventListener("click", function () { editRaid(p.raid.filter(function (x) { return x.id === r.getAttribute("data-r"); })[0]); }); });
+  }
+
+
+  // ---------- forecast (from the project's own history) ----------
+  function addDays(d, n) { var x = new Date(d + "T12:00:00"); x.setDate(x.getDate() + Math.round(n)); return x.toISOString().slice(0, 10); }
+  function daysBetween(a, b) { return Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5); }
+  function forecast(p) {
+    var t = today(), open = p.tasks.filter(function (x) { return x.status !== "done"; }).length;
+    var doneDates = p.tasks.filter(function (x) { return x.status === "done" && x.doneOn; }).map(function (x) { return x.doneOn; }).sort();
+    var f = { open: open, note: "" };
+    if (!open) { f.done = true; return f; }
+    var first = doneDates[0] || (p.history && p.history[0] && p.history[0].d) || p.start || t;
+    var span = Math.max(7, Math.min(28, daysBetween(first, t) || 7));
+    var since = addDays(t, -span), since14 = addDays(t, -Math.min(14, span));
+    var n = doneDates.filter(function (d) { return d >= since; }).length, n14 = doneDates.filter(function (d) { return d >= since14; }).length;
+    var added = p.tasks.filter(function (x) { return x.created && x.created >= since; }).length;
+    f.rate = n / span * 7; f.rate14 = n14 / Math.min(14, span) * 7; f.added = added / span * 7; f.span = span;
+    if (n < 2) { f.note = "Not enough finished tasks yet to forecast (" + n + " in the last " + span + " days). Tick tasks off as they finish and this fills in."; return f; }
+    var weeks = open / f.rate, lo = open / Math.max(f.rate, f.rate14), hi = open / Math.min(f.rate, f.rate14 || f.rate);
+    f.date = addDays(t, weeks * 7); f.early = addDays(t, lo * 7); f.late = addDays(t, Math.min(hi, 104) * 7);
+    if (f.added >= f.rate * 0.8 && added >= 2) f.note = "New tasks are being added nearly as fast as they're finished (" + f.added.toFixed(1) + " added vs " + f.rate.toFixed(1) + " done a week), so the finish date keeps moving.";
+    return f;
+  }
+  function rag(p, f) {
+    var why = [], lvl = 0, t = today();
+    var lateT = p.tasks.filter(late), blocked = p.tasks.filter(function (x) { return x.status === "blocked"; });
+    var hiR = p.raid.filter(function (r) { return r.status !== "Closed" && r.type !== "Issue" && r.impact * r.likelihood >= 6; });
+    var issues = p.raid.filter(function (r) { return r.status !== "Closed" && r.type === "Issue"; });
+    if (p.due && f.date && f.date > p.due) { var gap = daysBetween(p.due, f.date); if (gap > 14) { lvl = 2; why.push("forecast finish " + fmtDate(f.date) + " is " + gap + " days after the due date"); } else { lvl = Math.max(lvl, 1); why.push("forecast finish " + fmtDate(f.date) + " is just after the due date"); } }
+    if (p.due && p.due < t && f.open) { lvl = 2; why.push("past the due date with " + f.open + " task" + (f.open > 1 ? "s" : "") + " open"); }
+    if (lateT.length) { lvl = Math.max(lvl, lateT.length >= 3 ? 2 : 1); why.push(lateT.length + " overdue task" + (lateT.length > 1 ? "s" : "")); }
+    if (blocked.length) { lvl = Math.max(lvl, 1); why.push(blocked.length + " blocked"); }
+    if (hiR.length) { lvl = Math.max(lvl, 1); why.push(hiR.length + " high-scoring risk" + (hiR.length > 1 ? "s" : "") + " open"); }
+    if (issues.length) { lvl = Math.max(lvl, 1); why.push(issues.length + " open issue" + (issues.length > 1 ? "s" : "")); }
+    if (f.note && /keeps moving/.test(f.note)) { lvl = Math.max(lvl, 1); why.push("scope still growing"); }
+    if (!why.length) why.push(f.done ? "all tasks done" : "no overdue or blocked work and no high risks");
+    return { level: ["Green", "Amber", "Red"][lvl], why: why };
+  }
+  function phases(p) { var o = []; p.tasks.forEach(function (t) { var k = t.phase || ""; if (o.indexOf(k) < 0) o.push(k); }); return o; }
+  function links(p) {
+    var txt = [p.summary].concat(p.tasks.map(function (t) { return t.notes; }), p.notes.map(function (n) { return n.body; }), p.raid.map(function (r) { return r.detail; })).join("\n"), out = [], m, re = /https?:\/\/[^\s)>\]]+/g;
+    while ((m = re.exec(txt))) if (out.indexOf(m[0]) < 0) out.push(m[0]);
+    return out;
+  }
+  function tline(t, extra) {
+    var b = []; if (t.owner) b.push(t.owner); if (t.due) b.push((late(t) ? "**overdue**, was due " : "due ") + fmtDate(t.due)); if (extra) b.push(extra);
+    return "- " + t.title + (b.length ? " (" + b.join(", ") + ")" : "");
+  }
+  function firstPara(s) { return String(s || "").trim().split(/\n\s*\n/)[0] || ""; }
+  var TODO = function (s) { return "_To do: " + s + "_"; };
+
+  var DOCS = {
+    status: { label: "Status update", build: function (p, f, R) {
+      var t = today(), wk = addDays(t, -7), two = addDays(t, 14), L = [];
+      var done = p.tasks.filter(function (x) { return x.status === "done"; }).length, n = p.tasks.length;
+      L.push("# " + p.name + ": status update", "", "**Date:** " + fmtDate(t) + (p.owner ? " · **Owner:** " + p.owner : ""), "");
+      L.push("**Overall: " + R.level + ".** " + R.why[0].charAt(0).toUpperCase() + R.why.join("; ").slice(1) + ".", "");
+      L.push("**Progress:** " + done + " of " + n + " tasks done (" + (n ? Math.round(done / n * 100) : 0) + "%)." + (p.due ? " **Due:** " + fmtDate(p.due) + "." : ""));
+      if (f.date) L.push("**Forecast finish:** " + fmtDate(f.date) + (f.early !== f.late ? " (likely between " + fmtDate(f.early) + " and " + fmtDate(f.late) + ")" : "") + ", based on " + f.rate.toFixed(1) + " tasks finished a week.");
+      else if (!f.done && f.note) L.push("**Forecast:** " + f.note);
+      L.push("");
+      var recent = p.tasks.filter(function (x) { return x.status === "done" && x.doneOn && x.doneOn >= wk; });
+      L.push("## Done in the last week", ""); L.push(recent.length ? recent.map(function (x) { return "- " + x.title; }).join("\n") : "- Nothing marked done this week."); L.push("");
+      var doing = p.tasks.filter(function (x) { return x.status === "doing"; });
+      L.push("## In progress", ""); L.push(doing.length ? doing.map(function (x) { return tline(x); }).join("\n") : "- Nothing marked in progress."); L.push("");
+      var bl = p.tasks.filter(function (x) { return x.status === "blocked"; });
+      if (bl.length) { L.push("## Blocked: help needed", ""); bl.forEach(function (x) { L.push(tline(x)); }); L.push(""); }
+      var od = p.tasks.filter(late);
+      if (od.length) { L.push("## Overdue", ""); od.forEach(function (x) { L.push(tline(x)); }); L.push(""); }
+      var up = p.tasks.filter(function (x) { return x.status !== "done" && x.due && x.due >= t && x.due <= two; }).sort(function (a, b) { return a.due.localeCompare(b.due); });
+      L.push("## Coming up (next 2 weeks)", ""); L.push(up.length ? up.map(function (x) { return tline(x); }).join("\n") : "- No dated tasks in the next 2 weeks."); L.push("");
+      var rr = p.raid.filter(function (r) { return r.status !== "Closed"; }).sort(function (a, b) { return b.impact * b.likelihood - a.impact * a.likelihood; }).slice(0, 5);
+      if (rr.length) { L.push("## Top risks and issues", "", "| Type | Item | Score | Owner | Action |", "|---|---|---|---|---|"); rr.forEach(function (r) { L.push("| " + [r.type, r.title, r.impact * r.likelihood, r.owner || "", r.action || ""].join(" | ") + " |"); }); L.push(""); }
+      var dec = p.notes.filter(function (x) { return x.kind === "decision" && x.date >= addDays(t, -14); });
+      if (dec.length) { L.push("## Decisions in the last 2 weeks", ""); dec.forEach(function (x) { L.push("- " + fmtDate(x.date) + ": " + x.title); }); L.push(""); }
+      var asks = bl.map(function (x) { return "Unblock: " + x.title; }).concat(p.raid.filter(function (r) { return r.status !== "Closed" && !r.owner; }).map(function (r) { return "Needs an owner: " + r.title; }));
+      L.push("## Asks", ""); L.push(asks.length ? asks.map(function (a) { return "- " + a; }).join("\n") : "- None this week."); 
+      return L.join("\n");
+    } },
+    brief: { label: "Project brief", build: function (p, f, R) {
+      var L = [], ph = phases(p), owners = uniq(p.tasks.map(function (t) { return t.owner; }).concat([p.owner], p.raid.map(function (r) { return r.owner; })));
+      L.push("# " + p.name + ": project brief", "", "**Owner:** " + (p.owner || TODO("name")) + " · **Start:** " + (p.start ? fmtDate(p.start) : "-") + " · **Due:** " + (p.due ? fmtDate(p.due) : TODO("set a date")) + " · **Status:** " + p.status, "");
+      L.push("## Purpose", "", firstPara(p.summary) || TODO("why this project exists and the problem it solves"), "");
+      L.push("## Objectives", "", TODO("2–4 measurable outcomes, e.g. 'one destinations figure agreed by Careers and curriculum'"), "");
+      L.push("## Scope", "");
+      if (ph.length && !(ph.length === 1 && !ph[0])) {
+        L.push("| Phase | Tasks | Dates |", "|---|---|---|");
+        ph.forEach(function (k) { var ts = p.tasks.filter(function (t) { return (t.phase || "") === k; }), ds = ts.map(function (t) { return t.due; }).filter(Boolean).sort(); L.push("| " + (k || "General") + " | " + ts.length + " | " + (ds.length ? fmtDate(ds[0]) + (ds.length > 1 ? " to " + fmtDate(ds[ds.length - 1]) : "") : "-") + " |"); });
+      } else L.push(p.tasks.length ? p.tasks.slice(0, 12).map(function (t) { return "- " + t.title; }).join("\n") : TODO("what's in and what's out"));
+      L.push("", "**Out of scope:** " + TODO("anything people might assume is included but isn't"), "");
+      L.push("## Deliverables", "");
+      var del = ph.filter(Boolean); L.push(del.length ? del.map(function (k) { return "- " + k; }).join("\n") : TODO("the things that will exist at the end (reports, screens, documents)"));
+      L.push("", "## People", "", owners.length ? owners.map(function (o) { return "- " + o; }).join("\n") : TODO("owner, sponsor, users, who signs off"), "");
+      var rk = p.raid.filter(function (r) { return r.status !== "Closed"; });
+      L.push("## Risks, assumptions and dependencies", "");
+      if (rk.length) { L.push("| Type | Item | Score | Mitigation |", "|---|---|---|---|"); rk.forEach(function (r) { L.push("| " + [r.type, r.title, r.impact * r.likelihood, r.action || ""].join(" | ") + " |"); }); }
+      else L.push(TODO("what could go wrong, and what we're relying on"));
+      var dec = p.notes.filter(function (x) { return x.kind === "decision"; });
+      if (dec.length) { L.push("", "## Decisions so far", ""); dec.forEach(function (x) { L.push("- " + fmtDate(x.date) + ": " + x.title); }); }
+      L.push("", "## Timeline", "", (p.start ? "- Start: " + fmtDate(p.start) + "\n" : "") + (p.due ? "- Due: " + fmtDate(p.due) + "\n" : "") + (f.date ? "- Current forecast: " + fmtDate(f.date) : "- Forecast: not enough history yet"));
+      if ((p.diagrams || []).length) { L.push("", "## Process", ""); p.diagrams.forEach(function (d) { L.push("![" + d.name + "](../diagrams/" + dfile(d) + ".svg)"); }); }
+      L.push("", "## Success measures", "", TODO("how we'll know it worked"), "", "## Sign-off", "", TODO("who approves, and when"));
+      return L.join("\n");
+    } },
+    closure: { label: "Closure report", build: function (p, f, R) {
+      var L = [], done = p.tasks.filter(function (t) { return t.status === "done"; }), open = p.tasks.filter(function (t) { return t.status !== "done"; });
+      var lastDone = done.map(function (t) { return t.doneOn; }).filter(Boolean).sort().pop();
+      L.push("# " + p.name + ": closure report", "", "**Owner:** " + (p.owner || "-") + " · **Closed:** " + fmtDate(today()), "");
+      L.push("## Summary", "", firstPara(p.summary) || TODO("what the project set out to do"), "", TODO("one or two sentences on the outcome"), "");
+      L.push("## Dates", "", "| | Planned | Actual |", "|---|---|---|", "| Start | " + (p.start ? fmtDate(p.start) : "-") + " | " + (p.start ? fmtDate(p.start) : "-") + " |", "| Finish | " + (p.due ? fmtDate(p.due) : "-") + " | " + (lastDone ? fmtDate(lastDone) : "-") + " |");
+      if (p.due && lastDone) { var g = daysBetween(p.due, lastDone); L.push("", g > 0 ? "Finished " + g + " days late." : g < 0 ? "Finished " + (-g) + " days early." : "Finished on the due date."); }
+      L.push("", "## Delivered (" + done.length + ")", "");
+      phases(p).forEach(function (k) { var ts = done.filter(function (t) { return (t.phase || "") === k; }); if (!ts.length) return; if (k) L.push("**" + k + "**", ""); ts.forEach(function (t) { L.push("- " + t.title); }); L.push(""); });
+      L.push("## Not delivered (" + open.length + ")", ""); L.push(open.length ? open.map(function (t) { return "- " + t.title + " " + TODO("dropped, moved to another project, or handed over?"); }).join("\n") : "- Everything planned was delivered.");
+      var iss = p.raid.filter(function (r) { return r.type === "Issue" || r.status === "Closed"; });
+      L.push("", "## Issues and risks along the way", ""); L.push(iss.length ? iss.map(function (r) { return "- " + r.type + ": " + r.title + (r.status === "Closed" ? " (closed)" : " (**still open**)") + (r.action ? ": " + r.action : ""); }).join("\n") : "- None logged.");
+      var dec = p.notes.filter(function (x) { return x.kind === "decision"; });
+      if (dec.length) { L.push("", "## Key decisions", ""); dec.forEach(function (x) { L.push("- " + fmtDate(x.date) + ": " + x.title); }); }
+      L.push("", "## Lessons learned", "", "- What went well: " + TODO(""), "- What didn't: " + TODO(""), "- Do differently next time: " + TODO(""));
+      L.push("", "## Handover", "", "- Who looks after it now: " + TODO(""), "- Where things live: " + (links(p).length ? links(p).join(", ") : TODO("report paths, repos, documents")));
+      return L.join("\n");
+    } },
+    readme: { label: "README / handover", build: function (p, f, R) {
+      var L = [], lk = links(p), owners = uniq(p.tasks.map(function (t) { return t.owner; }).concat([p.owner]));
+      L.push("# " + p.name, "", p.summary ? p.summary.trim() : TODO("what this is and who uses it"), "");
+      L.push("## Status", "", "- " + p.status + ", " + p.tasks.filter(function (t) { return t.status === "done"; }).length + "/" + p.tasks.length + " tasks done" + (p.due ? ", due " + fmtDate(p.due) : ""), "");
+      L.push("## How it's put together", "");
+      var ph = phases(p).filter(Boolean); L.push(ph.length ? ph.map(function (k) { return "- **" + k + "**: " + p.tasks.filter(function (t) { return t.phase === k; }).map(function (t) { return t.title; }).slice(0, 6).join("; "); }).join("\n") : TODO("main parts, e.g. SQL views, SSRS report, schedule"));
+      L.push("", "## Open items", ""); var op = p.tasks.filter(function (t) { return t.status !== "done"; }); L.push(op.length ? op.map(function (t) { return tline(t); }).join("\n") : "- None.");
+      L.push("", "## Contacts", "", owners.length ? owners.map(function (o) { return "- " + o; }).join("\n") : TODO("who to ask"));
+      var dec = p.notes.filter(function (x) { return x.kind === "decision"; });
+      if (dec.length) { L.push("", "## Decision log", "", "| Date | Decision | Why |", "|---|---|---|"); dec.forEach(function (x) { L.push("| " + x.date + " | " + x.title + " | " + (x.body || "").replace(/\n+/g, " ").replace(/\|/g, "/") + " |"); }); }
+      var kr = p.raid.filter(function (r) { return r.status !== "Closed"; });
+      if (kr.length) { L.push("", "## Known issues and risks", ""); kr.forEach(function (r) { L.push("- " + r.type + ": " + r.title); }); }
+      if ((p.queries || []).length) { L.push("", "## SQL", "", "| Query | Database | What it does |", "|---|---|---|"); p.queries.forEach(function (q) { L.push("| [" + q.name + "](../sql/" + qfile(q) + ".sql) | " + (q.db || "") + " | " + (q.desc || "").replace(/\n+/g, " ").replace(/\|/g, "/") + " |"); }); }
+      if ((p.diagrams || []).length) { L.push("", "## Diagrams", ""); p.diagrams.forEach(function (d) { L.push("![" + d.name + "](../diagrams/" + dfile(d) + ".svg)"); }); }
+      L.push("", "## Links", "", lk.length ? lk.map(function (u) { return "- " + u; }).join("\n") : TODO("report server paths, repo, documentation"));
+      return L.join("\n");
+    } }
+  };
+  var docType = "status";
+  var AI = [["claude", "Claude"], ["chatgpt", "ChatGPT"], ["copilot", "Microsoft Copilot"], ["gemini", "Gemini"], ["other", "Any AI"]];
+  var aiTool = (function () { try { return localStorage.getItem("bitk.projects.ai") || "claude"; } catch (e) { return "claude"; } })(), aiShort = false;
+  // A compact version of the project for tools that limit how much you can paste in.
+  function shortMarkdown(p) {
+    var t = today(), L = ["# " + p.name, "", "Status: " + p.status + (p.owner ? " · Owner: " + p.owner : "") + (p.start ? " · Start: " + p.start : "") + (p.due ? " · Due: " + p.due : ""), ""];
+    if (p.summary) L.push(firstPara(p.summary).slice(0, 600), "");
+    var done = p.tasks.filter(function (x) { return x.status === "done"; });
+    L.push("Done: " + done.length + " of " + p.tasks.length + " tasks." + (done.length ? " Recently: " + done.filter(function (x) { return x.doneOn; }).sort(function (a, b) { return b.doneOn.localeCompare(a.doneOn); }).slice(0, 5).map(function (x) { return x.title; }).join("; ") + "." : ""), "");
+    L.push("Open tasks:");
+    p.tasks.filter(function (x) { return x.status !== "done"; }).slice(0, 25).forEach(function (x) { L.push("- " + x.title + " [" + statusLabel(x.status) + (x.owner ? ", " + x.owner : "") + (x.due ? ", due " + x.due + (late(x) ? " OVERDUE" : "") : "") + (x.phase ? ", " + x.phase : "") + "]"); });
+    var rr = p.raid.filter(function (r) { return r.status !== "Closed"; }).sort(function (a, b) { return b.impact * b.likelihood - a.impact * a.likelihood; }).slice(0, 5);
+    if (rr.length) { L.push("", "Top open risks/issues:"); rr.forEach(function (r) { L.push("- " + r.type + ": " + r.title + " (score " + r.impact * r.likelihood + (r.owner ? ", " + r.owner : "") + (r.action ? "; action: " + r.action : "") + ")"); }); }
+    var dec = p.notes.filter(function (x) { return x.kind === "decision"; }).sort(function (a, b) { return b.date.localeCompare(a.date); }).slice(0, 5);
+    if (dec.length) { L.push("", "Recent decisions:"); dec.forEach(function (x) { L.push("- " + x.date + ": " + x.title); }); }
+    return L.join("\n");
+  }
+  function aiPrompt(p, kind, tool, short) {
+    var what = { status: "a short weekly status update for my manager", brief: "a project brief (one to two pages) to agree scope with stakeholders", closure: "a project closure report", readme: "a README / handover document for whoever supports this next" }[kind];
+    var f = forecast(p), R = rag(p, f);
+    var calc = "Overall status: " + R.level + ". Reasons: " + R.why.join("; ") + "." + (f.date ? " Forecast finish: " + f.date + " (likely " + f.early + " to " + f.late + "), from " + f.rate.toFixed(1) + " tasks finished a week." : f.done ? " All tasks are done." : " No forecast yet: " + f.note) + " Today is " + today() + ".";
+    var data = short ? shortMarkdown(p) : toMarkdown(p).replace(/\n## Diagrams\n[\s\S]*?(?=\n_Saved from)/, "\n");
+    var dg = (p.diagrams || []).filter(function (d) { return d.mermaid; });
+    var qs = p.queries || [];
+    if (qs.length) data += "\n\n## SQL queries in this project\n" + qs.map(function (q) { return "- " + q.name + (q.db ? " (" + q.db + ")" : "") + (q.desc ? ": " + q.desc.replace(/\n+/g, " ") : ""); }).join("\n");
+    if (dg.length) data += "\n\n## Process diagrams (Mermaid flowchart syntax)\n" + dg.map(function (d) { return "\n### " + d.name + "\n```mermaid\n" + (short && d.mermaid.length > 2500 ? d.mermaid.slice(0, 2500) + "\n%% (trimmed)" : d.mermaid) + "\n```"; }).join("\n");
+    var rules = [
+      "Write " + what + " for the project below.",
+      "Use UK English. Keep it plain and concise, with headings and bullet points, in Markdown.",
+      "Use only the project data given. Don't invent names, dates, figures or outcomes. Where something is missing, put a clearly marked placeholder like [To confirm: ...].",
+      "Use the overall status, reasons and forecast exactly as given; they were calculated from the task history."
+    ];
+    if (tool === "copilot" || tool === "gemini") rules.push("Don't search the web or my files for this; everything you need is below.");
+    if (tool === "claude") {
+      return rules.join("\n") + "\n\n<calculated_status>\n" + calc + "\n</calculated_status>\n\n<project_data>\n" + data + "\n</project_data>";
+    }
+    return rules.join("\n") + "\n\nCALCULATED STATUS: " + calc + "\n\n=== PROJECT DATA START ===\n" + data + "\n=== PROJECT DATA END ===";
+  }
+  function claudePrompt(p, kind) { return aiPrompt(p, kind, "claude", false); }
+  function vDocs(B, p) {
+    var f = forecast(p), R = rag(p, f);
+    B.innerHTML = '<div class="fc"><span class="rag rag-' + R.level + '">' + R.level + '</span> ' + esc(R.why.join("; ")) + ".<br>" +
+      (f.done ? "All tasks are done." : f.date ? "<strong>Forecast finish: " + esc(fmtDate(f.date)) + "</strong>" + (f.early !== f.late ? " (likely " + esc(fmtDate(f.early)) + " to " + esc(fmtDate(f.late)) + ")" : "") + ", at " + f.rate.toFixed(1) + " tasks a week over the last " + f.span + " days, with " + f.open + " left." + (p.due ? " Due " + esc(fmtDate(p.due)) + "." : "") : esc(f.note)) +
+      (f.date && f.note ? '<br><span class="hint">' + esc(f.note) + "</span>" : "") + "</div>" +
+      '<div class="doctypes">' + Object.keys(DOCS).map(function (k) { return '<button data-doc="' + k + '" class="' + (k === docType ? "on" : "") + '">' + DOCS[k].label + "</button>"; }).join("") +
+      '<span class="sep" style="width:1px;background:var(--border);margin:0 4px"></span><button id="dCopy">Copy</button><button id="dDown">Download .md</button><button id="dFolder">Save to project folder</button><button id="dGh">Save to GitHub</button></div><div class="doctypes" style="align-items:center"><span class="hint">AI prompt for a fuller write-up:</span><select id="aiSel" aria-label="AI tool" style="min-height:0;padding:4px 8px">' + AI.map(function (a) { return '<option value="' + a[0] + '"' + (a[0] === aiTool ? " selected" : "") + ">" + a[1] + "</option>"; }).join("") + '</select>' +
+      '<label class="hint" style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="aiShort"' + (aiShort ? " checked" : "") + '> Short version</label><button id="dPrompt">Copy prompt</button><button id="dPromptDl" title="Save the prompt as a text file you can attach">Download prompt</button><span class="hint" id="aiLen"></span></div>' +
+      '<p class="hint" style="margin-top:0">Drafted from this project\'s tasks, dates, risks and decisions. Edit on the left; the preview updates. Lines in <em>italics</em> starting "To do" are gaps it can\'t fill from the data.</p>' +
+      '<div class="docs"><textarea id="docMd" spellcheck="true" aria-label="Markdown"></textarea><div class="prev md" id="docPrev"></div></div>';
+    var ta = $("docMd");
+    function gen() { ta.value = DOCS[docType].build(p, f, R); prev(); }
+    function prev() { $("docPrev").innerHTML = md(ta.value); }
+    gen();
+    ta.addEventListener("input", prev);
+    B.querySelectorAll("[data-doc]").forEach(function (b) { b.addEventListener("click", function () { docType = b.getAttribute("data-doc"); B.querySelectorAll("[data-doc]").forEach(function (x) { x.classList.toggle("on", x === b); }); gen(); }); });
+    function fname() { return (docType === "readme" ? "README-handover" : docType) + "-" + today() + ".md"; }
+    function flash(btn, txt) { var o = btn.textContent; btn.textContent = txt; setTimeout(function () { btn.textContent = o; }, 1600); }
+    function copy(text, btn) { (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { flash(btn, "Copied"); }, function () { prompt("Copy this:", text); }); }
+    $("dCopy").addEventListener("click", function () { copy(ta.value, this); });
+    function curPrompt() { return aiPrompt(p, docType, aiTool, aiShort); }
+    function showLen() { var n = curPrompt().length; $("aiLen").textContent = n.toLocaleString() + " characters" + (!aiShort && n > 8000 ? " (try Short version if the tool says it's too long)" : ""); }
+    $("aiSel").addEventListener("change", function () { aiTool = this.value; try { localStorage.setItem("bitk.projects.ai", aiTool); } catch (e) {} showLen(); });
+    $("aiShort").addEventListener("change", function () { aiShort = this.checked; showLen(); });
+    $("dPrompt").addEventListener("click", function () { copy(curPrompt(), this); });
+    $("dPromptDl").addEventListener("click", function () { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([curPrompt()], { type: "text/plain" })); a.download = slug(p.name) + "-" + docType + "-prompt.txt"; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); });
+    showLen();
+    B.querySelectorAll("[data-doc]").forEach(function (b) { b.addEventListener("click", showLen); });
+    $("dDown").addEventListener("click", function () { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([ta.value], { type: "text/markdown" })); a.download = slug(p.name) + "-" + fname(); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); });
+    $("dFolder").addEventListener("click", async function () {
+      var btn = this;
+      if (!dir || !dirOK) { alert("Connect a folder first with 'Save to a folder' at the top."); return; }
+      try { if (!p.folder) p.folder = slug(p.name) + "-" + p.id.slice(-4); var sub = await dir.getDirectoryHandle(p.folder, { create: true }), dd = await sub.getDirectoryHandle("docs", { create: true }); await writeFile(dd, fname(), ta.value); flash(btn, "Saved to " + p.folder + "/docs"); }
+      catch (e) { alert("Couldn't save: " + e.message); }
+    });
+    $("dGh").addEventListener("click", async function () {
+      var btn = this, c = ghCfg();
+      if (!c.repo || !c.token) { alert("Set up GitHub first with the 'GitHub…' button at the top."); return; }
+      try { btn.textContent = "Saving…"; await ghPut(ghPath(p, "docs/" + fname()), ta.value, DOCS[docType].label + ": " + p.name); btn.textContent = "Save to GitHub"; flash(btn, "Saved to GitHub"); }
+      catch (e) { btn.textContent = "Save to GitHub"; alert("GitHub save failed: " + e.message); }
+    });
+  }
+
+
+
+  // ---------- SQL store ----------
+  var selQ = null, qSearch = "", diskSql = {};
+  function qHist(q) {
+    q.hist = q.hist || [];
+    var last = q.hist[q.hist.length - 1];
+    if (q.sql && (!last || last.sql !== q.sql)) { q.hist.push({ at: q.updated || new Date().toISOString(), sql: q.sql }); if (q.hist.length > 30) q.hist.splice(0, q.hist.length - 30); }
+  }
+  function newQuery(p, name, sql, extra) {
+    var now = new Date().toISOString(), q = Object.assign({ id: id("q"), name: name || "New query", db: "", tags: "", desc: "", sql: sql || "", created: now, updated: now, hist: [] }, extra || {});
+    p.queries = p.queries || []; p.queries.push(q); return q;
+  }
+  function handTo(tool, page, q, p) {
+    if (!q.sql.trim()) return;
+    if (window.BITK && BITK.give({ tool: tool, files: [{ name: qname(q) + ".sql", text: q.sql }], from: { project: p.id, query: q.id, name: q.name, projectName: p.name } })) window.open("../" + page + "/index.html", "_blank");
+  }
+  function vSql(B, p) {
+    var qs = p.queries || [];
+    if (selQ && !qs.some(function (q) { return q.id === selQ; })) selQ = null;
+    if (!selQ && qs.length) selQ = qs.slice().sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); })[0].id;
+    B.innerHTML = '<div class="filters"><button class="primary" id="qNew">New query</button><button id="qImp">Import .sql files</button><input type="file" id="qFile" accept=".sql,.txt" multiple hidden>' +
+      '<span class="hint">Saved with the project as <code>sql/*.sql</code> when you save to a folder or GitHub. You can also drop .sql files here.</span></div>' +
+      (qs.length ? '<div class="sqlw"><div class="qlist"><input type="search" id="qFind" placeholder="Search name, tag or SQL" value="' + esc(qSearch) + '"><div id="qItems"></div></div><div class="qed" id="qEd"></div></div>'
+        : '<div class="empty">No queries yet. Click <strong>New query</strong>, import .sql files, or use <em>Save to project</em> in the <a href="../sql-checker/index.html">SQL Checker</a>.</div>');
+    $("qNew").addEventListener("click", function () { var q = newQuery(p, "New query", ""); selQ = q.id; touch(p); render(); var n = $("qName"); if (n) { n.focus(); n.select(); } });
+    $("qImp").addEventListener("click", function () { $("qFile").click(); });
+    function importFiles(files) {
+      var left = files.length, last = null;
+      Array.prototype.forEach.call(files, function (f) {
+        var r = new FileReader();
+        r.onload = function () {
+          var base = f.name.replace(/\.(sql|txt)$/i, ""), fn = slug(base), taken = (p.queries || []).some(function (x) { return x.file === fn; });
+          var q = newQuery(p, base.replace(/[-_]+/g, " "), r.result, taken ? {} : { file: fn }); last = q; if (!--left) { selQ = last.id; touch(p); render(); } };
+        r.readAsText(f);
+      });
+    }
+    $("qFile").addEventListener("change", function () { importFiles(this.files); this.value = ""; });
+    B.addEventListener("dragover", function (e) { if (e.dataTransfer && Array.prototype.some.call(e.dataTransfer.items || [], function (i) { return i.kind === "file"; })) e.preventDefault(); });
+    B.addEventListener("drop", function (e) { var fl = Array.prototype.filter.call(e.dataTransfer.files || [], function (f) { return /\.(sql|txt)$/i.test(f.name); }); if (fl.length) { e.preventDefault(); importFiles(fl); } });
+    if (!qs.length) return;
+    function drawList() {
+      var t = qSearch.toLowerCase();
+      $("qItems").innerHTML = qs.filter(function (q) { return !t || (q.name + " " + q.tags + " " + q.db + " " + q.desc + " " + q.sql).toLowerCase().indexOf(t) >= 0; })
+        .sort(function (a, b) { return a.name.localeCompare(b.name); })
+        .map(function (q) { return '<button class="qi' + (q.id === selQ ? " on" : "") + '" data-q="' + q.id + '"><b>' + esc(q.name) + "</b><span>" + esc([q.db, q.tags].filter(Boolean).join(" · ") || (q.sql.trim().split("\n")[0] || "(empty)")) + "</span></button>"; }).join("") || '<p class="hint" style="padding:6px">No matches.</p>';
+      $("qItems").querySelectorAll("[data-q]").forEach(function (b) { b.addEventListener("click", function () { selQ = b.getAttribute("data-q"); drawList(); drawEd(); }); });
+    }
+    $("qFind").addEventListener("input", function () { qSearch = this.value; drawList(); });
+    var saveQT;
+    function drawEd() {
+      var q = qs.filter(function (x) { return x.id === selQ; })[0], E = $("qEd"); if (!q) { E.innerHTML = ""; return; }
+      var dbs = uniq(qs.map(function (x) { return x.db; }).concat(["EBS", "4CAST"]));
+      E.innerHTML = '<div class="fg"><div><label>Name</label><input id="qName" value="' + esc(q.name) + '"></div><div><label>Database</label><input id="qDb" list="qDbs" value="' + esc(q.db) + '" placeholder="e.g. EBS, 4CAST"><datalist id="qDbs">' + dbs.map(function (d) { return '<option value="' + esc(d) + '">'; }).join("") + "</datalist></div>" +
+        '<div><label>Tags</label><input id="qTags" value="' + esc(q.tags) + '" placeholder="e.g. ILR, attendance, SSRS dataset"></div><div><label>File</label><input value="sql/' + esc(qname(q)) + '.sql" readonly title="Name of the file in the project folder / GitHub. It stays the same if you rename the query, so git history isn\'t broken."></div>' +
+        '<div class="full"><label>What it does</label><textarea id="qDesc" placeholder="Purpose, parameters, where it\'s used (e.g. which SSRS report)">' + esc(q.desc) + "</textarea></div></div>" +
+        '<div class="qbar"><button id="qCopy">Copy</button><button id="qDl">Download .sql</button><button id="qChk">Check in SQL Checker</button><button id="qErd">Show joins (Query ERD)</button><button id="qNb" title="Add or update the standard notes block in the SQL Notes Block tool, then Save back">Notes block</button><button id="qFx" title="Rewrite OUTER/CROSS APPLY and STRING_AGG for the EBS Central validator, then Save back">Fix for EBS</button>' +
+        '<select id="qHist" title="Earlier versions saved here"><option value="">History (' + (q.hist || []).length + ")</option>" + (q.hist || []).slice().reverse().map(function (h, i) { return '<option value="' + ((q.hist.length - 1) - i) + '">' + esc(h.at.slice(0, 16).replace("T", " ")) + " · " + h.sql.length + " chars</option>"; }).join("") + "</select>" +
+        '<button id="qDup">Duplicate</button><button id="qDel">Delete</button><span class="saved" id="qSaved">Saved ' + esc((q.updated || "").slice(0, 16).replace("T", " ")) + "</span></div>" +
+        '<textarea class="sqlbox" id="qSql" spellcheck="false" aria-label="SQL" placeholder="SELECT ...">' + esc(q.sql) + "</textarea>";
+      function changed(field, v) {
+        q[field] = v; clearTimeout(saveQT);
+        $("qSaved").textContent = "Saving…";
+        saveQT = setTimeout(function () { q.updated = new Date().toISOString(); touch(p); $("qSaved").textContent = "Saved " + q.updated.slice(11, 16); drawList(); }, 600);
+      }
+      $("qName").addEventListener("input", function () { changed("name", this.value.trim() || "Untitled query"); });
+      $("qDb").addEventListener("input", function () { changed("db", this.value.trim()); });
+      $("qTags").addEventListener("input", function () { changed("tags", this.value.trim()); });
+      $("qDesc").addEventListener("input", function () { changed("desc", this.value); });
+      var ta = $("qSql"), before = q.sql;
+      ta.addEventListener("focus", function () { before = q.sql; });
+      ta.addEventListener("input", function () { changed("sql", ta.value); });
+      ta.addEventListener("blur", function () { if (q.sql !== before) { var keep = q.sql; q.sql = before; qHist(q); q.sql = keep; touch(p); } });
+      ta.addEventListener("keydown", function (e) {
+        if (e.key !== "Tab") return; e.preventDefault();
+        var a = ta.selectionStart, z = ta.selectionEnd, v = ta.value;
+        if (a === z && !e.shiftKey) { ta.value = v.slice(0, a) + "    " + v.slice(z); ta.selectionStart = ta.selectionEnd = a + 4; }
+        else { // indent / outdent the selected lines
+          var ls = v.lastIndexOf("\n", a - 1) + 1, block = v.slice(ls, z), nb = e.shiftKey ? block.replace(/^ {1,4}/gm, "") : block.replace(/^/gm, "    ");
+          ta.value = v.slice(0, ls) + nb + v.slice(z); ta.selectionStart = ls; ta.selectionEnd = ls + nb.length;
+        }
+        changed("sql", ta.value);
+      });
+      function flash(b, t) { var o = b.textContent; b.textContent = t; setTimeout(function () { b.textContent = o; }, 1500); }
+      $("qCopy").addEventListener("click", function () { var b = this; (navigator.clipboard ? navigator.clipboard.writeText(q.sql) : Promise.reject()).then(function () { flash(b, "Copied"); }, function () { ta.select(); document.execCommand("copy"); flash(b, "Copied"); }); });
+      $("qDl").addEventListener("click", function () { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([q.sql], { type: "text/plain" })); a.download = qname(q) + ".sql"; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); });
+      $("qChk").addEventListener("click", function () { handTo("sql", "sql-checker", q, p); });
+      $("qErd").addEventListener("click", function () { handTo("erd", "query-erd", q, p); });
+      $("qNb").addEventListener("click", function () { handTo("notes", "sql-notes", q, p); });
+      $("qFx").addEventListener("click", function () { handTo("ebsfix", "ebs-fixer", q, p); });
+      $("qHist").addEventListener("change", function () {
+        if (this.value === "") return; var h = q.hist[+this.value];
+        if (confirm("Put back the version from " + h.at.slice(0, 16).replace("T", " ") + "? The current text is kept in History.")) { qHist(q); q.sql = h.sql; q.updated = new Date().toISOString(); touch(p); drawEd(); }
+        else this.value = "";
+      });
+      $("qDup").addEventListener("click", function () { var c = newQuery(p, q.name + " (copy)", q.sql, { db: q.db, tags: q.tags, desc: q.desc }); selQ = c.id; touch(p); render(); });
+      $("qDel").addEventListener("click", async function () {
+        if (!confirm("Delete \"" + q.name + "\" from this project?" + (dir && dirOK ? " Its .sql file in the project folder is deleted too." : ""))) return;
+        if (dir && dirOK && p.folder) { try { var sub = await dir.getDirectoryHandle(p.folder), sq = await sub.getDirectoryHandle("sql"); await sq.removeEntry(qfile(q) + ".sql"); } catch (e) {} }
+        p.queries.splice(p.queries.indexOf(q), 1); selQ = null; touch(p); render();
+      });
+    }
+    drawList(); drawEd();
+  }
+
+  // ---------- diagrams (from the Flowchart Builder) ----------
+  var FSTORE = "bitk.flow.v1";
+  function flowStore() { try { var s = JSON.parse(localStorage.getItem(FSTORE) || "null"); return s && s.docs ? s : { cur: null, docs: {} }; } catch (e) { return { cur: null, docs: {} }; } }
+  // The Flowchart Builder draws previews for us in a hidden frame.
+  var rq = { n: 0, wait: {}, frame: null, ready: null };
+  window.addEventListener("message", function (ev) {
+    var m = ev.data || {};
+    if (m.type === "bitk-flow-ready" && rq.ready) { rq.ready(); rq.ready = null; }
+    if (m.type === "bitk-flow-svg" && rq.wait[m.id]) { rq.wait[m.id](m); delete rq.wait[m.id]; }
+  });
+  function renderer() {
+    if (rq.frame) return rq.frame;
+    rq.frame = new Promise(function (res) {
+      var f = document.createElement("iframe"); f.title = "Flowchart renderer"; f.setAttribute("aria-hidden", "true"); f.tabIndex = -1;
+      f.style.cssText = "position:absolute;left:-10000px;top:0;width:1200px;height:800px;border:0";
+      rq.ready = function () { res(f); };
+      f.src = "../flowchart/index.html?render=1"; document.body.appendChild(f);
+      setTimeout(function () { if (rq.ready) { rq.ready = null; res(f); } }, 6000);
+    });
+    return rq.frame;
+  }
+  function renderFlow(doc) {
+    return renderer().then(function (f) {
+      return new Promise(function (res) {
+        var id = "r" + (++rq.n); rq.wait[id] = res;
+        f.contentWindow.postMessage({ type: "bitk-flow-render", id: id, doc: doc }, "*");
+        setTimeout(function () { if (rq.wait[id]) { delete rq.wait[id]; res({ error: "timed out" }); } }, 8000);
+      });
+    });
+  }
+  async function attachFlow(p, doc, flowId) {
+    var r = await renderFlow(doc), now = new Date().toISOString();
+    p.diagrams = p.diagrams || [];
+    var d = flowId && p.diagrams.filter(function (x) { return x.flowId === flowId; })[0];
+    if (!d) { d = { id: id("g"), flowId: flowId || null, added: now }; p.diagrams.push(d); }
+    d.name = doc.name || "Flowchart"; d.doc = doc; d.svg = r.svg || ""; d.mermaid = r.mermaid || ""; d.updated = now;
+    touch(p); return d;
+  }
+  // Pull in changes made in the Flowchart Builder to linked diagrams.
+  async function refreshLinked(p) {
+    var fs = flowStore(), changed = false;
+    for (var i = 0; i < (p.diagrams || []).length; i++) {
+      var d = p.diagrams[i], src = d.flowId && fs.docs[d.flowId];
+      if (!src || !src.updated || src.updated <= Date.parse(d.updated || 0)) continue;
+      var r = await renderFlow(src.doc); d.doc = src.doc; d.name = src.doc.name || d.name; d.svg = r.svg || d.svg; d.mermaid = r.mermaid || d.mermaid; d.updated = new Date().toISOString(); changed = true;
+    }
+    if (changed) { touch(p); if (tab === "diagrams" && P() === p) renderPane(); }
+  }
+  function svgURL(svg) { return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); }
+  function openInBuilder(p, d) {
+    var fs = flowStore();
+    if (!d.flowId || !fs.docs[d.flowId]) { d.flowId = d.flowId || "d" + Date.now(); fs.docs[d.flowId] = { updated: Date.now(), doc: d.doc }; touch(p); }
+    fs.cur = d.flowId;
+    try { localStorage.setItem(FSTORE, JSON.stringify(fs)); } catch (e) { alert("Browser storage is full."); return; }
+    window.open("../flowchart/index.html", "_blank");
+  }
+  function vDiagrams(B, p) {
+    var ds = p.diagrams || [], fs = flowStore();
+    B.innerHTML = '<div class="filters"><button class="primary" id="dgAdd">Add from Flowchart Builder</button><button id="dgNew">New flowchart for this project</button><button id="dgImp">Import .flow.json</button><input type="file" id="dgFile" accept=".json" multiple hidden>' +
+      '<span class="hint">Linked flowcharts update here when you change them in the builder.</span></div>' +
+      (ds.length ? '<div class="dgrid">' + ds.map(function (d) {
+        var linked = d.flowId && fs.docs[d.flowId];
+        return '<div class="dcard"><div class="img" data-zoom="' + d.id + '">' + (d.svg ? '<img alt="' + esc(d.name) + '" src="' + svgURL(d.svg) + '">' : '<span class="hint">No preview yet</span>') + "</div>" +
+          '<div class="dt"><b>' + esc(d.name) + '</b><span class="hint">' + (linked ? "Linked to Flowchart Builder" : "Copy in this project") + " · updated " + esc(fmtDate((d.updated || "").slice(0, 10))) + "</span></div>" +
+          '<div class="acts"><button data-open="' + d.id + '">Open in builder</button><button data-svg="' + d.id + '">SVG</button><button data-pdf="' + d.id + '">PDF</button><button data-json="' + d.id + '">.flow.json</button><button data-del="' + d.id + '">Remove</button></div></div>';
+      }).join("") + "</div>" : '<div class="empty">No diagrams yet. Add a process map from the Flowchart Builder, or start a new one for this project.</div>');
+    function dById(x) { return ds.filter(function (d) { return d.id === x; })[0]; }
+    function dl(blob, name) { var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); }
+    $("dgAdd").addEventListener("click", function () {
+      var F = $("dlgForm"), ids = Object.keys(fs.docs).sort(function (a, b) { return (fs.docs[b].updated || 0) - (fs.docs[a].updated || 0); });
+      F.innerHTML = "<h2>Add from Flowchart Builder</h2>" + (ids.length ? '<p class="hint" style="margin-top:0">Flowcharts saved in this browser:</p>' + ids.map(function (k) {
+        var already = ds.some(function (d) { return d.flowId === k; }), doc = fs.docs[k].doc || {};
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><strong>' + esc(doc.name || "Untitled") + '</strong> <span class="hint">' + (doc.nodes || []).length + " shapes" + (already ? " · already in this project" : "") + '</span></div><button type="button" data-pick="' + k + '"' + (already ? "" : ' class="primary"') + ">" + (already ? "Update" : "Add") + "</button></div>";
+      }).join("") : '<p>No flowcharts in this browser yet. Use <strong>New flowchart for this project</strong>, or draw one in the <a href="../flowchart/index.html">Flowchart Builder</a>.</p>') +
+        '<div class="dlg-acts"><span class="sp"></span><button type="button" id="dCancel">Close</button></div>';
+      $("dCancel").onclick = function () { $("dlg").close(); };
+      F.querySelectorAll("[data-pick]").forEach(function (b) {
+        b.onclick = async function () { b.disabled = true; b.textContent = "Adding…"; var k = b.getAttribute("data-pick"); await attachFlow(p, JSON.parse(JSON.stringify(fs.docs[k].doc)), k); b.textContent = "Added ✓"; render(); };
+      });
+      $("dlg").showModal();
+    });
+    $("dgNew").addEventListener("click", async function () {
+      var fid = "d" + Date.now(), doc = { name: p.name + " process", nodes: [], edges: [], lanes: [], dir: "TB" }, f2 = flowStore();
+      f2.docs[fid] = { updated: Date.now(), doc: doc }; f2.cur = fid;
+      try { localStorage.setItem(FSTORE, JSON.stringify(f2)); } catch (e) { alert("Browser storage is full."); return; }
+      p.diagrams = p.diagrams || []; p.diagrams.push({ id: id("g"), flowId: fid, name: doc.name, doc: doc, svg: "", mermaid: "", added: new Date().toISOString(), updated: new Date(0).toISOString() });
+      touch(p); render(); window.open("../flowchart/index.html", "_blank");
+    });
+    $("dgImp").addEventListener("click", function () { $("dgFile").click(); });
+    $("dgFile").addEventListener("change", function () {
+      Array.prototype.forEach.call(this.files, function (f) {
+        var r = new FileReader();
+        r.onload = async function () {
+          try { var j = JSON.parse(r.result), doc = j.doc || j; if (!doc || !Array.isArray(doc.nodes)) throw new Error("not a flowchart"); doc.name = doc.name || f.name.replace(/\.flow\.json$|\.json$/i, ""); await attachFlow(p, doc, null); render(); }
+          catch (e) { alert(f.name + " isn't a flowchart saved from the Flowchart Builder (" + e.message + ")."); }
+        };
+        r.readAsText(f);
+      });
+      this.value = "";
+    });
+    B.querySelectorAll("[data-open]").forEach(function (b) { b.addEventListener("click", function () { openInBuilder(p, dById(b.getAttribute("data-open"))); }); });
+    B.querySelectorAll("[data-svg]").forEach(function (b) { b.addEventListener("click", function () { var d = dById(b.getAttribute("data-svg")); if (d.svg) dl(new Blob([d.svg], { type: "image/svg+xml" }), dfile(d) + ".svg"); }); });
+    B.querySelectorAll("[data-pdf]").forEach(function (b) { b.addEventListener("click", function () { var d = dById(b.getAttribute("data-pdf")); if (d.svg && window.BITK_EXPORT) BITK_EXPORT.pdf(d.svg, d.name, { title: p.name + " · " + d.name }); }); });
+    B.querySelectorAll("[data-json]").forEach(function (b) { b.addEventListener("click", function () { var d = dById(b.getAttribute("data-json")); dl(new Blob([JSON.stringify({ bitkFlow: 1, doc: d.doc }, null, 1)], { type: "application/json" }), dfile(d) + ".flow.json"); }); });
+    B.querySelectorAll("[data-del]").forEach(function (b) { b.addEventListener("click", function () { var d = dById(b.getAttribute("data-del")); if (!confirm("Remove \"" + d.name + "\" from this project? (The flowchart itself stays in the Flowchart Builder.)")) return; p.diagrams.splice(p.diagrams.indexOf(d), 1); touch(p); render(); }); });
+    B.querySelectorAll("[data-zoom]").forEach(function (z) { z.addEventListener("click", function () {
+      var d = dById(z.getAttribute("data-zoom")); if (!d.svg) return;
+      var F = $("dlgForm"); $("dlg").classList.add("pp-big");
+      F.innerHTML = "<h2>" + esc(d.name) + '</h2><div class="img"><img alt="" src="' + svgURL(d.svg) + '"></div><div class="dlg-acts"><span class="sp"></span><button type="button" id="dCancel" class="primary">Close</button></div>';
+      $("dCancel").onclick = function () { $("dlg").close(); }; $("dlg").showModal();
+    }); });
+    refreshLinked(p);
+  }
+
+  // ---------- generic form dialog ----------
+  function form(title, fields, obj, onSave, onDelete) {
+    var F = $("dlgForm");
+    F.innerHTML = "<h2>" + esc(title) + '</h2><div class="fg">' + fields.map(function (f) {
+      var v = obj[f.k] == null ? "" : obj[f.k], inp;
+      if (f.t === "select") inp = '<select name="' + f.k + '">' + f.o.map(function (o) { var ov = Array.isArray(o) ? o[0] : o, ol = Array.isArray(o) ? o[1] : o; return '<option value="' + esc(ov) + '"' + (String(v) === String(ov) ? " selected" : "") + ">" + esc(ol) + "</option>"; }).join("") + "</select>";
+      else if (f.t === "area") inp = '<textarea name="' + f.k + '" placeholder="' + esc(f.ph || "") + '">' + esc(v) + "</textarea>";
+      else inp = '<input name="' + f.k + '" type="' + (f.t || "text") + '" value="' + esc(v) + '"' + (f.list ? ' list="dl-' + f.k + '"' : "") + (f.req ? " required" : "") + ' placeholder="' + esc(f.ph || "") + '">' + (f.list ? '<datalist id="dl-' + f.k + '">' + f.list.map(function (x) { return '<option value="' + esc(x) + '">'; }).join("") + "</datalist>" : "");
+      return '<div class="' + (f.full ? "full" : "") + '"><label>' + esc(f.l) + "</label>" + inp + "</div>";
+    }).join("") + '</div><div class="dlg-acts">' + (onDelete ? '<button type="button" id="dDel">Delete</button>' : "") + '<span class="sp"></span><button type="button" id="dCancel">Cancel</button><button type="submit" class="primary" value="ok">Save</button></div>';
+    var d = $("dlg");
+    $("dCancel").onclick = function () { d.close(); };
+    if (onDelete) $("dDel").onclick = function () { if (confirm("Delete this?")) { d.close(); onDelete(); } };
+    F.onsubmit = function (e) {
+      e.preventDefault();
+      var o = {}; fields.forEach(function (f) { var el = F.elements[f.k]; o[f.k] = f.t === "number" ? +el.value : el.value.trim ? (f.t === "area" ? el.value.replace(/\s+$/, "") : el.value.trim()) : el.value; });
+      d.close(); onSave(o);
+    };
+    d.showModal();
+    var first = F.querySelector("input,textarea,select"); if (first) first.focus();
+  }
+  function editTask(t, isNew) {
+    var p = P();
+    form(isNew ? "New task" : "Task", [
+      { k: "title", l: "Task", full: 1, req: 1 },
+      { k: "status", l: "Status", t: "select", o: TSTAT }, { k: "priority", l: "Priority", t: "select", o: PRI },
+      { k: "owner", l: "Owner", list: uniq(p.tasks.map(function (x) { return x.owner; }).concat([p.owner])) }, { k: "due", l: "Due", t: "date" },
+      { k: "phase", l: "Phase / milestone", list: uniq(p.tasks.map(function (x) { return x.phase; })), full: 1 },
+      { k: "notes", l: "Notes (Markdown)", t: "area", full: 1 }
+    ], t, function (o) {
+      if (o.status === "done" && t.status !== "done") o.doneOn = today();
+      Object.assign(t, o); if (isNew) p.tasks.push(t); touch(p); render();
+    }, isNew ? null : function () { p.tasks.splice(p.tasks.indexOf(t), 1); touch(p); render(); });
+  }
+  function editNote(n, isNew) {
+    var p = P();
+    form(isNew ? "New " + (n.kind === "decision" ? "decision" : n.kind === "meeting" ? "meeting notes" : "note") : "Note", [
+      { k: "title", l: n.kind === "decision" ? "What was decided" : "Title", full: 1, req: 1 },
+      { k: "kind", l: "Type", t: "select", o: NKIND }, { k: "date", l: "Date", t: "date" },
+      { k: "body", l: n.kind === "decision" ? "Why, who agreed, alternatives (Markdown)" : "Notes (Markdown)", t: "area", full: 1 }
+    ], n, function (o) { Object.assign(n, o); if (isNew) p.notes.push(n); touch(p); render(); }, isNew ? null : function () { p.notes.splice(p.notes.indexOf(n), 1); touch(p); render(); });
+  }
+  function editRaid(r, isNew) {
+    var p = P(), lv = [[1, "1 Low"], [2, "2 Medium"], [3, "3 High"]];
+    form(isNew ? "New risk / issue" : r.type, [
+      { k: "title", l: "Item", full: 1, req: 1 },
+      { k: "type", l: "Type", t: "select", o: RAIDT }, { k: "status", l: "Status", t: "select", o: ["Open", "Closed"] },
+      { k: "impact", l: "Impact", t: "select", o: lv }, { k: "likelihood", l: "Likelihood", t: "select", o: lv },
+      { k: "owner", l: "Owner" }, { k: "date", l: "Raised", t: "date" },
+      { k: "action", l: "Action / mitigation", full: 1 }, { k: "detail", l: "Detail", t: "area", full: 1 }
+    ], r, function (o) { o.impact = +o.impact; o.likelihood = +o.likelihood; Object.assign(r, o); if (isNew) p.raid.push(r); touch(p); render(); }, isNew ? null : function () { p.raid.splice(p.raid.indexOf(r), 1); touch(p); render(); });
+  }
+  function editProject() {
+    var p = P();
+    form("Project details", [
+      { k: "name", l: "Name", full: 1, req: 1 }, { k: "status", l: "Status", t: "select", o: STATUSES }, { k: "owner", l: "Owner" },
+      { k: "start", l: "Start", t: "date" }, { k: "due", l: "Due", t: "date" },
+      { k: "summary", l: "Summary: goals, scope, stakeholders (Markdown)", t: "area", full: 1 }
+    ], p, function (o) { Object.assign(p, o); touch(p); render(); }, function () {
+      delete db.projects[p.id]; db.cur = Object.keys(db.projects)[0] || null; save(); render();
+      alert("Deleted from this browser. Copies already saved to a folder or GitHub are left alone; delete those yourself if you want them gone.");
+    });
+  }
+
+  // ---------- toolbar ----------
+  $("newBtn").addEventListener("click", function () {
+    var p = blank(""); p.name = "";
+    form("New project", [{ k: "name", l: "Name", full: 1, req: 1 }, { k: "owner", l: "Owner" }, { k: "due", l: "Due", t: "date" }, { k: "summary", l: "Summary (optional)", t: "area", full: 1 }], p, function (o) {
+      Object.assign(p, o); db.projects[p.id] = p; db.cur = p.id; tab = "tasks"; touch(p); render();
+    });
+  });
+  $("mdBtn").addEventListener("click", function () {
+    var F = $("dlgForm");
+    F.innerHTML = '<h2>Import a Markdown plan</h2><p class="hint" style="margin-top:0">Paste a plan, e.g. from a Claude chat. <code># Title</code> names the project; other headings become phases; <code>- [ ]</code> and bullet lines become tasks (<code>@owner !high due:YYYY-MM-DD</code> work too). Sections headed Risks, Issues, Assumptions, Dependencies, Decisions, Notes or Summary go to their own places.</p>' +
+      '<textarea id="mdIn" style="width:100%;min-height:300px;font-family:var(--mono);font-size:13px;box-sizing:border-box" placeholder="# Learner destinations report&#10;&#10;## Summary&#10;Replace the Excel destinations tracker with an SSRS report.&#10;&#10;## Discovery&#10;- [x] Agree fields with Careers @Luke&#10;- [ ] Map EBS tables !high due:2026-12-05&#10;&#10;## Build&#10;- [ ] Dataset query&#10;- [ ] Report layout&#10;&#10;## Risks&#10;- Destinations data entered late by tutors&#10;&#10;## Decisions&#10;- Use EBS as the single source"></textarea>' +
+      '<div class="dlg-acts"><label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="mdInto"> Add to the current project instead of creating a new one</label><span class="sp"></span><button type="button" id="dCancel">Cancel</button><button type="submit" class="primary">Import</button></div>';
+    $("dCancel").onclick = function () { $("dlg").close(); };
+    if (!P()) { $("mdInto").disabled = true; }
+    F.onsubmit = function (e) {
+      e.preventDefault();
+      var txt = $("mdIn").value; if (!txt.trim()) return;
+      var np = fromMarkdown(txt);
+      if ($("mdInto").checked && P()) {
+        var p = P(); p.tasks = p.tasks.concat(np.tasks); p.notes = p.notes.concat(np.notes); p.raid = p.raid.concat(np.raid);
+        if (np.summary && !p.summary) p.summary = np.summary; touch(p);
+      } else { db.projects[np.id] = np; db.cur = np.id; touch(np); }
+      $("dlg").close(); tab = "overview"; render();
+    };
+    $("dlg").showModal(); $("mdIn").focus();
+  });
+  $("copyMd").addEventListener("click", function () {
+    var p = P(); if (!p) return; var t = toMarkdown(p), b = this;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy as Markdown"; }, 1500); }, function () { prompt("Copy this:", t); });
+  });
+  $("exportBtn").addEventListener("click", function () {
+    var p = P(); if (!p) return;
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(p, null, 2)], { type: "application/json" }));
+    a.download = slug(p.name) + ".project.json"; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+  $("importBtn").addEventListener("click", function () { $("importFile").click(); });
+  $("importFile").addEventListener("change", function () {
+    Array.prototype.forEach.call(this.files, function (f) { var r = new FileReader(); r.onload = function () { importText(r.result, f.name); }; r.readAsText(f); });
+    this.value = "";
+  });
+  function valid(p) { return p && p.bitkProject && p.id && Array.isArray(p.tasks); }
+  function mergeIn(p) {
+    p.notes = p.notes || []; p.raid = p.raid || [];
+    var mine = db.projects[p.id];
+    if (mine && (mine.updated || "") > (p.updated || "")) return false;
+    db.projects[p.id] = p; return true;
+  }
+  function importText(text, name) {
+    try { var p = JSON.parse(text); if (!valid(p)) throw new Error("not a project file"); mergeIn(p); db.cur = p.id; save(); render(); }
+    catch (e) { alert(name + " isn't a project saved from this tool (" + e.message + ")."); }
+  }
+
+  // ---------- local folder (File System Access API, Chrome/Edge) ----------
+  var dir = null, dirOK = false, folderMsg = "";
+  var hasFS = typeof window.showDirectoryPicker === "function";
+  function idb(op, val) {
+    return new Promise(function (res) {
+      try {
+        var rq = indexedDB.open("bitk-projects", 1);
+        rq.onupgradeneeded = function () { rq.result.createObjectStore("kv"); };
+        rq.onsuccess = function () {
+          try {
+          var tx = rq.result.transaction("kv", op === "get" ? "readonly" : "readwrite"), st = tx.objectStore("kv");
+          var r2 = op === "get" ? st.get("dir") : op === "del" ? st.delete("dir") : st.put(val, "dir");
+          r2.onsuccess = function () { res(r2.result); }; r2.onerror = function () { res(null); };
+          } catch (e) { res(null); }
+        };
+        rq.onerror = function () { res(null); };
+      } catch (e) { res(null); }
+    });
+  }
+  async function writeFile(d, name, text) { var fh = await d.getFileHandle(name, { create: true }); var w = await fh.createWritable(); await w.write(text); await w.close(); }
+  async function writeProject(p) {
+    if (!p.folder) p.folder = slug(p.name) + "-" + p.id.slice(-4);
+    var sub = await dir.getDirectoryHandle(p.folder, { create: true });
+    await writeFile(sub, "project.json", JSON.stringify(p, null, 2));
+    await writeFile(sub, "README.md", toMarkdown(p));
+    var qs = p.queries || [];
+    if (qs.length) { var sq = await sub.getDirectoryHandle("sql", { create: true }); for (var qi = 0; qi < qs.length; qi++) { var qq = qs[qi]; if (diskSql[qq.id] !== qq.sql) { await writeFile(sq, qfile(qq) + ".sql", qq.sql || ""); diskSql[qq.id] = qq.sql; } } }
+    var ds = p.diagrams || [];
+    if (ds.length) {
+      var dd = await sub.getDirectoryHandle("diagrams", { create: true }), keep = {};
+      for (var i = 0; i < ds.length; i++) { var f = dfile(ds[i]); keep[f + ".svg"] = keep[f + ".flow.json"] = 1; if (ds[i].svg) await writeFile(dd, f + ".svg", ds[i].svg); await writeFile(dd, f + ".flow.json", JSON.stringify({ bitkFlow: 1, doc: ds[i].doc }, null, 1)); }
+      for await (var e of dd.values()) if (e.kind === "file" && /\.(svg|flow\.json)$/.test(e.name) && !keep[e.name]) { try { await dd.removeEntry(e.name); } catch (x) {} }
+    }
+  }
+  async function flushFolder() {
+    if (!dir || !dirOK) return;
+    var ids = Object.keys(dirty); dirty = {};
+    try { for (var i = 0; i < ids.length; i++) if (db.projects[ids[i]]) await writeProject(db.projects[ids[i]]); folderMsg = "Saved " + new Date().toTimeString().slice(0, 5); localStorage.setItem(STORE, JSON.stringify(db)); }
+    catch (e) { folderMsg = "Folder save failed: " + e.message; ids.forEach(function (k) { dirty[k] = 1; }); }
+    syncState();
+  }
+  // .sql files edited or added in the folder (SSMS, VS Code, git pull) come back into the project
+  async function readSql(pdir, p) {
+    var sq; try { sq = await pdir.getDirectoryHandle("sql"); } catch (e) { return false; }
+    var changed = false; p.queries = p.queries || [];
+    for await (var e of sq.values()) {
+      if (e.kind !== "file" || !/\.sql$/i.test(e.name)) continue;
+      var file = await e.getFile(), text = await file.text(), base = e.name.replace(/\.sql$/i, "");
+      var q = p.queries.filter(function (x) { return qfile(x) === base; })[0];
+      if (q) {
+        if (text !== q.sql && file.lastModified > Date.parse(q.updated || 0) + 1000) { qHist(q); q.sql = text; diskSql[q.id] = text; q.updated = new Date(file.lastModified).toISOString(); changed = true; }
+        else diskSql[q.id] = text;
+      } else {
+        var nq = { id: id("q"), name: base.replace(/[-_]+/g, " "), file: base, db: "", tags: "", desc: "", sql: text, created: new Date(file.lastModified).toISOString(), updated: new Date(file.lastModified).toISOString(), hist: [] };
+        p.queries.push(nq); diskSql[nq.id] = text; changed = true;
+      }
+    }
+    if (changed) { p.updated = new Date().toISOString(); dirty[p.id] = 1; }
+    return changed;
+  }
+  async function readFolder() {
+    var n = 0;
+    for await (var entry of dir.values()) {
+      if (entry.kind !== "directory") continue;
+      try { var fh = await entry.getFileHandle("project.json"), txt = await (await fh.getFile()).text(), p = JSON.parse(txt); if (valid(p)) { p.folder = entry.name; if (mergeIn(p)) n++; if (await readSql(entry, db.projects[p.id])) n++; } } catch (e) {}
+    }
+    return n;
+  }
+  async function connectFolder(pick) {
+    try {
+      if (pick || !dir) { dir = await window.showDirectoryPicker({ id: "bitk-projects", mode: "readwrite" }); await idb("put", dir); }
+      var perm = dir.requestPermission ? await dir.requestPermission({ mode: "readwrite" }) : "granted";
+      if (perm !== "granted") { dirOK = false; folderMsg = "Permission not given"; syncState(); return; }
+      dirOK = true;
+      var got = await readFolder();
+      Object.keys(db.projects).forEach(function (k) { dirty[k] = 1; });
+      await flushFolder();
+      if (!db.cur) db.cur = Object.keys(db.projects)[0] || null;
+      save(); render();
+      folderMsg = "Connected" + (got ? ", loaded " + got + " project" + (got > 1 ? "s" : "") : ""); syncState();
+    } catch (e) { if (e.name !== "AbortError") alert("Couldn't use that folder: " + e.message); }
+  }
+  $("folderBtn").addEventListener("click", function () {
+    if (!hasFS) { alert("Saving straight to a folder needs Chrome or Edge. In this browser, use Export file and Import file instead."); return; }
+    if (dir && !dirOK) { connectFolder(false); return; }
+    if (dir && dirOK) {
+      var F = $("dlgForm");
+      F.innerHTML = '<h2>Folder</h2><p>Saving to <strong>' + esc(dir.name) + '</strong>. Each project is a subfolder with <code>project.json</code> and <code>README.md</code>.</p><div class="dlg-acts"><button type="button" id="fDisc">Stop saving to this folder</button><span class="sp"></span><button type="button" id="fPick">Choose another folder</button><button type="button" id="fReload">Reload from folder</button><button type="button" class="primary" id="fOk">OK</button></div>';
+      $("fOk").onclick = function () { $("dlg").close(); };
+      $("fPick").onclick = function () { $("dlg").close(); connectFolder(true); };
+      $("fReload").onclick = async function () { $("dlg").close(); var n = await readFolder(); save(); render(); folderMsg = "Reloaded (" + n + " newer)"; syncState(); };
+      $("fDisc").onclick = function () { $("dlg").close(); dir = null; dirOK = false; idb("del"); folderMsg = ""; syncState(); };
+      $("dlg").showModal(); return;
+    }
+    connectFolder(true);
+  });
+  (async function () {
+    if (!hasFS) return;
+    var h = await idb("get"); if (!h) return; dir = h;
+    try { var q = dir.queryPermission ? await dir.queryPermission({ mode: "readwrite" }) : "granted"; dirOK = q === "granted"; } catch (e) { dirOK = false; }
+    if (dirOK) { await readFolder(); Object.keys(db.projects).forEach(function (k) { dirty[k] = 1; }); save(); render(); folderMsg = "Connected"; }
+    syncState();
+  })();
+
+  // ---------- GitHub (optional, opt-in) ----------
+  function ghCfg() { try { return JSON.parse(localStorage.getItem(GHCFG) || sessionStorage.getItem(GHCFG) || "null") || {}; } catch (e) { return {}; } }
+  var ghMsg = "";
+  function b64(s) { var b = new TextEncoder().encode(s), out = ""; for (var i = 0; i < b.length; i += 0x8000) out += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(out); }
+  function unb64(s) { var bin = atob(s.replace(/\s/g, "")), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new TextDecoder().decode(u); }
+  async function gh(method, path, body) {
+    var c = ghCfg();
+    var r = await fetch("https://api.github.com/repos/" + encodeURIComponent(c.owner) + "/" + encodeURIComponent(c.repo) + path, {
+      method: method, headers: Object.assign({ "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" }, c.token ? { "Authorization": "Bearer " + c.token } : {}),
+      body: body ? JSON.stringify(body) : undefined, cache: "no-store"
+    });
+    if (r.status === 404 && method === "GET") return null;
+    if (!r.ok) {
+      var t = ""; try { t = (await r.json()).message; } catch (e) {}
+      if (r.status === 401) t = "the token was refused. It may have expired or been revoked; make a new one (GitHub… → How to get a token)";
+      else if (r.status === 403 && method !== "GET") t = "the token can't write to this repo. Check it has Contents: Read and write for " + c.repo;
+      else if (r.status === 404 && method !== "GET") t = "repo not found. Check the owner and repo name, and that the token can see this repo";
+      throw new Error(r.status + " " + (t || r.statusText));
+    }
+    return r.status === 204 ? {} : r.json();
+  }
+  function ghPath(p, file) { var c = ghCfg(), base = (c.path || "projects").replace(/^\/+|\/+$/g, ""); if (!p.folder) p.folder = slug(p.name) + "-" + p.id.slice(-4); return (base ? base + "/" : "") + p.folder + "/" + file; }
+  async function ghPut(path, text, msg) {
+    var c = ghCfg(), enc = path.split("/").map(encodeURIComponent).join("/");
+    var cur = await gh("GET", "/contents/" + enc + "?ref=" + encodeURIComponent(c.branch || "main"));
+    var body = { message: msg, content: b64(text), branch: c.branch || "main" }; if (cur && cur.sha) body.sha = cur.sha;
+    if (cur && cur.content && unb64(cur.content) === text) return false;
+    await gh("PUT", "/contents/" + enc, body); return true;
+  }
+  async function ghSave(all) {
+    var list = all ? Object.keys(db.projects).map(function (k) { return db.projects[k]; }) : [P()];
+    ghMsg = "Saving…"; syncState();
+    try {
+      var n = 0;
+      for (var i = 0; i < list.length; i++) {
+        var p = list[i], msg = "Update project: " + p.name;
+        if (await ghPut(ghPath(p, "project.json"), JSON.stringify(p, null, 2), msg)) n++;
+        await ghPut(ghPath(p, "README.md"), toMarkdown(p), msg);
+        for (var qj = 0; qj < (p.queries || []).length; qj++) { var qx = p.queries[qj]; await ghPut(ghPath(p, "sql/" + qfile(qx) + ".sql"), qx.sql || "", msg); }
+        for (var j = 0; j < (p.diagrams || []).length; j++) { var dg = p.diagrams[j], fn = dfile(dg); if (dg.svg) await ghPut(ghPath(p, "diagrams/" + fn + ".svg"), dg.svg, msg); await ghPut(ghPath(p, "diagrams/" + fn + ".flow.json"), JSON.stringify({ bitkFlow: 1, doc: dg.doc }, null, 1), msg); }
+      }
+      var at = new Date().toISOString(); list.forEach(function (x) { x.ghAt = at; });
+      save(); render(); ghMsg = "Saved to GitHub " + new Date().toTimeString().slice(0, 5) + (n ? "" : " (no changes)");
+    } catch (e) { ghMsg = "GitHub save failed: " + e.message; }
+    syncState();
+  }
+  async function ghLoad() {
+    var c = ghCfg(), base = (c.path || "projects").replace(/^\/+|\/+$/g, "");
+    ghMsg = "Loading…"; syncState();
+    try {
+      var items = await gh("GET", "/contents/" + base.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(c.branch || "main")) || [];
+      var n = 0;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type !== "dir") continue;
+        var f = await gh("GET", "/contents/" + items[i].path.split("/").map(encodeURIComponent).join("/") + "/project.json?ref=" + encodeURIComponent(c.branch || "main"));
+        if (!f || !f.content) continue;
+        try { var p = JSON.parse(unb64(f.content)); if (valid(p)) { p.folder = items[i].name; p.ghAt = new Date().toISOString(); if (mergeIn(p)) n++; else if (db.projects[p.id]) { db.projects[p.id].ghAt = p.ghAt; db.projects[p.id].folder = db.projects[p.id].folder || p.folder; } } } catch (e) {}
+      }
+      if (!db.cur) db.cur = Object.keys(db.projects)[0] || null;
+      save(); render(); ghMsg = "Loaded " + n + " newer project" + (n === 1 ? "" : "s") + " from GitHub";
+    } catch (e) { ghMsg = "GitHub load failed: " + e.message; }
+    syncState();
+  }
+
+  function ghWeb(p) {
+    var c = ghCfg(); if (!c.owner || !c.repo || !p.folder) return "";
+    var base = (c.path == null ? "projects" : c.path).replace(/^\/+|\/+$/g, "");
+    return "https://github.com/" + encodeURIComponent(c.owner) + "/" + encodeURIComponent(c.repo) + "/tree/" + encodeURIComponent(c.branch || "main") + "/" + (base ? base.split("/").map(encodeURIComponent).join("/") + "/" : "") + encodeURIComponent(p.folder);
+  }
+  function ghLink(p) { var u = p.ghAt && ghWeb(p); return u ? '<a class="chip" href="' + esc(u) + '" target="_blank" rel="noopener" title="Open this project\'s folder in your GitHub repo">View on GitHub ↗</a>' : ""; }
+  // List every project saved in the repo, including ones no longer in this browser, and open any of them.
+  async function ghBrowse() {
+    var c = ghCfg();
+    if (!c.owner || !c.repo) { $("ghBtn").click(); return; }
+    var F = $("dlgForm"), base = (c.path == null ? "projects" : c.path).replace(/^\/+|\/+$/g, ""), ref = "?ref=" + encodeURIComponent(c.branch || "main");
+    F.innerHTML = "<h2>Open from GitHub</h2><p class=\"hint\" style=\"margin-top:0\">" + esc(c.owner + "/" + c.repo + "/" + base) + '</p><div id="ghList"><p>Loading…</p></div><div class="dlg-acts"><button type="button" id="ghAllBtn" disabled>Load all missing and newer</button><span class="sp"></span><button type="button" id="dCancel" class="primary">Close</button></div>';
+    $("dCancel").onclick = function () { $("dlg").close(); };
+    $("dlg").showModal();
+    var rows = [];
+    try {
+      var items = (await gh("GET", "/contents/" + base.split("/").map(encodeURIComponent).join("/") + ref)) || [];
+      var dirs = items.filter(function (x) { return x.type === "dir"; });
+      rows = (await Promise.all(dirs.map(async function (d) {
+        var f = await gh("GET", "/contents/" + d.path.split("/").map(encodeURIComponent).join("/") + "/project.json" + ref);
+        if (!f || !f.content) return null;
+        try { var p = JSON.parse(unb64(f.content)); if (!valid(p)) return null; p.folder = d.name; return p; } catch (e) { return null; }
+      }))).filter(Boolean);
+    } catch (e) { $("ghList").innerHTML = '<p class="late">Couldn\'t read the repo: ' + esc(e.message) + "</p><p class=\"hint\">For a private repo you need a token (GitHub… button). Check the owner, repo, branch and folder.</p>"; return; }
+    if (!rows.length) { $("ghList").innerHTML = '<p>No projects found in that folder yet. Save one with <strong>GitHub… → Save this project</strong>.</p>'; return; }
+    function state(p) { var l = db.projects[p.id]; if (!l) return ["missing", "Not in this browser"]; var a = l.updated || "", b = p.updated || ""; return a === b ? ["same", "Same as this browser"] : b > a ? ["newer", "GitHub copy is newer"] : ["older", "This browser's copy is newer"]; }
+    function take(p) { p.ghAt = new Date().toISOString(); db.projects[p.id] = p; }
+    function draw() {
+      rows.sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); });
+      $("ghList").innerHTML = '<table class="pt"><tr><th>Project</th><th>Status</th><th>Last change</th><th>Here?</th><th></th></tr>' + rows.map(function (p, i) {
+        var st = state(p), open = p.tasks.filter(function (t) { return t.status !== "done"; }).length;
+        return "<tr><td><strong>" + esc(p.name) + '</strong><br><span class="hint">' + open + " open tasks" + ((p.queries || []).length ? " · " + p.queries.length + " queries" : "") + "</span></td><td>" + esc(p.status) + "</td><td>" + esc((p.updated || "").slice(0, 16).replace("T", " ")) + '</td><td class="' + (st[0] === "missing" || st[0] === "newer" ? "" : "hint") + '">' + st[1] +
+          '</td><td style="white-space:nowrap"><button type="button" data-o="' + i + '" class="' + (st[0] === "missing" || st[0] === "newer" ? "primary" : "") + '">Open</button>' + (st[0] === "older" ? ' <button type="button" data-r="' + i + '" title="Replace this browser\'s copy with the one on GitHub">Use GitHub copy</button>' : "") + "</td></tr>";
+      }).join("") + "</table>";
+      var todo = rows.filter(function (p) { var s2 = state(p)[0]; return s2 === "missing" || s2 === "newer"; });
+      $("ghAllBtn").disabled = !todo.length; $("ghAllBtn").textContent = todo.length ? "Load all missing and newer (" + todo.length + ")" : "Everything here is up to date";
+      $("ghList").querySelectorAll("[data-o]").forEach(function (b) { b.onclick = function () {
+        var p = rows[+b.getAttribute("data-o")], st = state(p)[0];
+        if (st === "missing" || st === "newer") take(p); else db.projects[p.id].ghAt = db.projects[p.id].ghAt || new Date().toISOString();
+        db.cur = p.id; dirty[p.id] = 1; save(); $("dlg").close(); tab = "overview"; render();
+      }; });
+      $("ghList").querySelectorAll("[data-r]").forEach(function (b) { b.onclick = function () {
+        var p = rows[+b.getAttribute("data-r")];
+        if (!confirm("Replace \"" + p.name + "\" in this browser with the GitHub copy? Changes made here since it was last saved to GitHub are lost (export a file first if unsure).")) return;
+        take(p); db.cur = p.id; dirty[p.id] = 1; save(); $("dlg").close(); render();
+      }; });
+    }
+    $("ghAllBtn").onclick = function () { var n = 0; rows.forEach(function (p) { var s2 = state(p)[0]; if (s2 === "missing" || s2 === "newer") { take(p); dirty[p.id] = 1; n++; } }); if (!db.cur) db.cur = rows[0].id; save(); render(); ghMsg = "Loaded " + n + " from GitHub"; syncState(); draw(); };
+    draw();
+  }
+  $("ghOpen").addEventListener("click", ghBrowse);
+  $("ghBtn").addEventListener("click", function () {
+    var c = ghCfg(), F = $("dlgForm"), set = !!(c.owner && c.repo);
+    F.innerHTML = '<h2>GitHub</h2><p class="hint" style="margin-top:0">Optional. Saves each project (with its SQL and diagrams) into a repo using GitHub\'s API. Nothing is sent until you click Save or Open. A private repo is best for work projects.</p>' +
+      '<details' + (c.token ? "" : " open") + ' style="margin:0 0 12px"><summary style="cursor:pointer;font-weight:600">How to get a token (2 minutes)</summary><ol class="hint" style="margin:8px 0 0;padding-left:20px;line-height:1.6">' +
+      '<li>If you don\'t have one yet, <a href="https://github.com/new" target="_blank" rel="noopener">create a repo ↗</a> (e.g. <code>projects</code>, set to Private).</li>' +
+      '<li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener"><strong>New fine-grained token ↗</strong></a> (GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens).</li>' +
+      '<li>Name it e.g. <em>BI Toolkit planner</em> and pick an expiry date (you\'ll make a new one when it runs out).</li>' +
+      '<li><strong>Repository access</strong>: <em>Only select repositories</em> → your projects repo.</li>' +
+      '<li><strong>Permissions → Repository permissions → Contents</strong>: <em>Read and write</em>. Nothing else is needed.</li>' +
+      '<li>Click <strong>Generate token</strong>, copy it (it starts <code>github_pat_</code>) and paste it below. GitHub only shows it once; if you lose it, just make a new one.</li>' +
+      '</ol><p class="hint" style="margin:6px 0 0">See or revoke your tokens: <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener">your fine-grained tokens ↗</a> · <a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" target="_blank" rel="noopener">GitHub\'s guide ↗</a>. To only <em>read</em> a public repo you can leave the token blank.</p></details>' +
+'<div class="fg"><div><label>Owner</label><input name="owner" value="' + esc(c.owner || "lr-bi") + '"></div><div><label>Repo</label><input name="repo" value="' + esc(c.repo || "") + '" placeholder="e.g. projects"></div>' +
+      '<div><label>Branch</label><input name="branch" value="' + esc(c.branch || "main") + '"></div><div><label>Folder in repo</label><input name="path" value="' + esc(c.path == null ? "projects" : c.path) + '"></div>' +
+      '<div class="full"><label>Token</label><input name="token" type="password" value="' + esc(c.token || "") + '" autocomplete="off" placeholder="github_pat_…"></div>' +
+      '<div class="full"><label style="display:flex;gap:6px;align-items:center;color:var(--text)"><input type="checkbox" name="remember"' + (localStorage.getItem(GHCFG) ? " checked" : "") + ' style="width:auto"> Remember the token in this browser (otherwise it\'s forgotten when you close the tab)</label></div></div>' +
+      '<div class="dlg-acts"><button type="button" id="gForget">Forget settings</button><span class="sp"></span><button type="button" id="gLoad"' + (set ? "" : " disabled") + '>Open from GitHub…</button><button type="button" id="gAll"' + (set ? "" : " disabled") + '>Save all</button><button type="submit" class="primary">Save this project</button></div>';
+    function canGo() { var ok = F.elements.owner.value.trim() && F.elements.repo.value.trim(); $("gLoad").disabled = !ok; $("gAll").disabled = !(ok && F.elements.token.value.trim()); }
+    ["owner", "repo", "token"].forEach(function (n) { F.elements[n].addEventListener("input", canGo); });
+    function keep() {
+      var o = { owner: F.elements.owner.value.trim(), repo: F.elements.repo.value.trim(), branch: F.elements.branch.value.trim() || "main", path: F.elements.path.value.trim(), token: F.elements.token.value.trim() };
+      localStorage.removeItem(GHCFG); sessionStorage.removeItem(GHCFG);
+      (F.elements.remember.checked ? localStorage : sessionStorage).setItem(GHCFG, JSON.stringify(o));
+      return o.owner && o.repo;
+    }
+    canGo();
+    $("gForget").onclick = function () { localStorage.removeItem(GHCFG); sessionStorage.removeItem(GHCFG); ghMsg = ""; $("dlg").close(); syncState(); };
+    $("gLoad").onclick = function () { if (keep()) { $("dlg").close(); ghBrowse(); } };
+    $("gAll").onclick = function () { if (keep() && ghCfg().token) { $("dlg").close(); ghSave(true); } else alert("Saving needs a token."); };
+    F.onsubmit = function (e) { e.preventDefault(); if (!keep() || !ghCfg().token) { alert("Fill in owner, repo and a token to save."); return; } $("dlg").close(); if (P()) ghSave(false); };
+    $("dlg").showModal();
+  });
+
+  function syncState() {
+    var fs = $("folderState"), gs = $("ghState"), c = ghCfg();
+    fs.innerHTML = !hasFS ? "" : dir ? '<span class="dot ' + (dirOK ? (/fail/.test(folderMsg) ? "err" : "on") : "warn") + '"></span>Folder: ' + esc(dir.name) + (dirOK ? (folderMsg ? " · " + esc(folderMsg) : "") : " · click Save to a folder to reconnect") : '<span class="dot"></span>Browser only';
+    gs.innerHTML = c.repo ? '<span class="dot ' + (/fail/.test(ghMsg) ? "err" : ghMsg ? "on" : "") + '"></span>GitHub: ' + esc(c.owner + "/" + c.repo) + (ghMsg ? " · " + esc(ghMsg) : "") : "";
+    $("folderBtn").textContent = dir ? (dirOK ? "Folder…" : "Reconnect folder") : "Save to a folder";
+  }
+
+  $("dlg").addEventListener("close", function () { $("dlg").classList.remove("pp-big"); if (pendingDb) { applyDb(pendingDb); pendingDb = null; } });
+  // Another tab (e.g. the Flowchart Builder) changed the saved projects: pick that up.
+  var pendingDb = null;
+  function applyDb(text) {
+    try {
+      var nd = JSON.parse(text); if (!nd || !nd.projects) return;
+      Object.keys(nd.projects).forEach(function (k) { if (!db.projects[k] || (nd.projects[k].updated || "") > (db.projects[k].updated || "")) dirty[k] = 1; });
+      var cur = db.cur; db = nd; if (db.projects[cur]) db.cur = cur;
+      clearTimeout(saveT); saveT = setTimeout(flushFolder, 700); render();
+    } catch (e) {}
+  }
+  window.addEventListener("storage", function (e) { if (e.key !== STORE || !e.newValue) return; if ($("dlg").open) pendingDb = e.newValue; else applyDb(e.newValue); });
+
+  // ---------- start ----------
+  load();
+  var hand = window.BITK && BITK.take();
+  if (hand && hand.tool === "project" && hand.files) hand.files.forEach(function (f) { importText(f.text, f.name); });
+  var seeded = false; try { seeded = !!localStorage.getItem("bitk.projects.seeded"); localStorage.setItem("bitk.projects.seeded", "1"); } catch (e) {}
+  if (!Object.keys(db.projects).length && !seeded) {
+    var ex = fromMarkdown("# Example: Learner destinations report\n\n## Summary\nReplace the Excel destinations tracker with an SSRS report fed from EBS, so Careers and curriculum see one version.\n\n## Discovery\n- [x] Agree fields with Careers @Luke\n- [ ] Map EBS destination tables @Luke !high due:" + today() + "\n\n## Build\n- [ ] Dataset query in progress\n- [ ] Report layout and parameters\n- [ ] Publish to report server\n\n## Risks\n- Tutors enter destinations late, so early figures look low\n\n## Issues\n- No access to the careers system's database yet\n\n## Decisions\n- **" + today() + "**: Use EBS as the single source — the careers spreadsheet is retired once the report is live");
+    ex.status = "Active"; ex.owner = "Luke"; db.projects[ex.id] = ex; db.cur = ex.id; save();
+  }
+  render();
+  window.__pp = { get db() { return db; }, fromMarkdown: fromMarkdown, toMarkdown: toMarkdown, parseQuick: parseQuick, forecast: forecast, rag: rag, DOCS: DOCS, claudePrompt: claudePrompt, aiPrompt: aiPrompt, renderFlow: renderFlow };
+})();
+</script>
+<script src="../../assets/export.js"></script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>

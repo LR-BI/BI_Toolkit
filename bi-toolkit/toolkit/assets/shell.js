@@ -23,7 +23,7 @@
   var side = el("aside", "sidebar");
   var brand = el("a", "brand"); brand.href = root + "index.html";
   var logo = el("img", "logo"); logo.src = root + "assets/favicon.svg"; logo.alt = ""; brand.appendChild(logo);
-  var bt = el("span", "bt"); bt.appendChild(el("span", "bn", "BI Toolkit")); bt.appendChild(el("span", "bs", "work tools"));
+  var bt = el("span", "bt"); bt.appendChild(el("span", "bn", "BI Toolkit")); bt.appendChild(el("span", "bs", "Developed by LR"));
   brand.appendChild(bt); side.appendChild(brand);
 
   var sw = el("div", "sidesearch");
@@ -143,14 +143,14 @@
     if (!t || t.tagName !== "TEXTAREA" || t.offsetParent === null) return;
     t.style.height = "auto";
     var min = parseFloat(getComputedStyle(t).minHeight) || 0;
-    t.style.height = Math.max(min, t.scrollHeight + 2) + "px";
+    t.style.height = Math.max(min, t.scrollHeight + (t.offsetHeight - t.clientHeight)) + "px";   // borders + any horizontal scrollbar
   }
   document.addEventListener("input", function (e) { grow(e.target); });
   var lastVals = new WeakMap();
   setInterval(function () { document.querySelectorAll("textarea").forEach(function (t) { if (lastVals.get(t) !== t.value) { lastVals.set(t, t.value); grow(t); } }); }, 300);
   window.addEventListener("resize", function () { document.querySelectorAll("textarea").forEach(grow); });
 
-  // Drag to scroll anything marked .pan (scrollbars are hidden site-wide)
+  // Drag to scroll anything marked .pan (as well as its scrollbars)
   document.addEventListener("pointerdown", function (e) {
     var box = e.target.closest && e.target.closest(".pan");
     if (!box || e.button !== 0 || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(e.target.tagName)) return;

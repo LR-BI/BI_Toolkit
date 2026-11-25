@@ -14,15 +14,29 @@ window.TOOL_ICONS = {
   "ssrs-expressions": '<path d="M8.5 20c2 0 2.6-1.4 3-3.8l1.6-8.4c.4-2.4 1-3.8 3-3.8"/><path d="M8 10.5h7"/><path d="M15.5 13.5l5 5.5M20.5 13.5l-5 5.5"/>',
   "excel-to-ssrs": '<rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M6 7v3.5M10 7v5M14 7v3.5M18 7v5"/>',
   "flowchart": '<rect x="7" y="2" width="10" height="5" rx="2.5"/><path d="M12 7v2.5"/><path d="M12 9.5l5 3.5-5 3.5-5-3.5z"/><path d="M17 13h2.5V19H14.5"/><rect x="5" y="17" width="9.5" height="4.5" rx="1"/>',
+  "project-planner": '<rect x="4" y="3.5" width="16" height="18" rx="2"/><path d="M9 3.5V2h6v1.5"/><path d="M8 9.5l1.5 1.5L12 8.5M8 15l1.5 1.5L12 14"/><path d="M14 10h3M14 15.5h3"/>',
+  "sql-notes": '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 12.5h8M8 16h5"/>',
+  "ebs-fixer": '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+  "safe-change": '<path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  "ontrack-builder": '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 13h5M7 16h8"/><path d="M16 12.5l1.5 1.5-1.5 1.5"/>',
   "password": '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L20 3"/><path d="M17 6l3 3M14.5 8.5l2.5 2.5"/>'
 };
 // Tool list. Add one entry per tool; the hub builds itself from this.
 // cat: category heading on the hub. icon: 1-3 letters for the tile.
-window.CATEGORIES = ["SQL Server", "EBS & ILR", "Reporting", "Diagrams", "Admin"];
+window.CATEGORIES = ["SQL Server", "EBS & ILR", "Reporting", "Diagrams", "Planning", "Admin"];
 window.TOOLS = [
   { cat: "SQL Server", icon: "SQL", name: "SQL Checker", path: "tools/sql-checker/index.html", svg: "sql-checker",
     desc: "Seven-step check of a T-SQL query: syntax slips SQL Server rejects, unknown aliases, GROUP BY mistakes, join and NULL traps, and (with Schema Map) missing tables and columns.",
     tags: ["SQL", "EBS", "lint"] },
+  { cat: "SQL Server", icon: "FX", name: "EBS Validator Fixer", path: "tools/ebs-fixer/index.html", svg: "ebs-fixer",
+    desc: "Rewrite what EBS Central's validator rejects: OUTER/CROSS APPLY into scalar subqueries or joins, STRING_AGG into STUFF(FOR XML PATH).",
+    tags: ["validator", "ebs central", "outer apply", "cross apply", "string_agg", "rewrite", "configurable screen"] },
+  { cat: "SQL Server", icon: "SC", name: "Safe Change Script", path: "tools/safe-change/index.html", svg: "safe-change",
+    desc: "Build a safe UPDATE / DELETE / INSERT for live data: preview, backup table, transaction, row-count check, dry run by default, log and undo script.",
+    tags: ["update", "delete", "insert", "backup", "rollback", "transaction", "undo", "permissions", "live data"] },
+  { cat: "SQL Server", icon: "NB", name: "SQL Notes Block", path: "tools/sql-notes/index.html", svg: "sql-notes",
+    desc: "Add the standard header block to a query: title, dated change log (LR - ... | dd/mm/yy) and open notes, with lines suggested from the SQL.",
+    tags: ["notes", "header", "comment", "change log", "documentation", "block"] },
   { cat: "SQL Server", icon: "QP", name: "Query Plan Reader", path: "tools/plan-reader/index.html", svg: "plan-reader",
     desc: "Drop in a .sqlplan: costly steps, scans, key lookups, bad estimates, fan-out, spills, per-row functions, missing indexes.",
     tags: ["SQL", "performance", "execution plan"] },
@@ -47,6 +61,9 @@ window.TOOLS = [
   { cat: "EBS & ILR", icon: "#", name: "Learner Digit Checker", path: "tools/learner-digit-checker/index.html", svg: "learner-digit-checker",
     desc: "Check ULN check digits, NI numbers, postcodes and UKPRNs against ILR rules, with a cleaned-up list.",
     tags: ["ILR", "ULN", "NINO", "postcode", "UKPRN", "data quality"] },
+  { cat: "EBS & ILR", icon: "OB", name: "Ontrack Page Builder", path: "tools/ontrack-builder/index.html", svg: "ontrack-builder",
+    desc: "Build a Screen Designer CustomHTML script from rules: defaults, show/hide, required, locks, ULN/NI checks, grid colours, banners, buttons and after-save steps. Includes F12 helpers and a test plan.",
+    tags: ["ontrack", "screen designer", "customhtml", "javascript", "default", "validation", "show hide", "16-18", "age"] },
   { cat: "EBS & ILR", icon: "OT", name: "Ontrack Field Helper", path: "tools/ontrack-helper/index.html", svg: "ontrack-helper",
     desc: "Field name to jQuery selectors (input, hidden twin, read-only text) and ready-made Screen Designer snippets.",
     tags: ["EBS", "Ontrack", "Screen Designer", "jQuery", "javascript"] },
@@ -62,6 +79,9 @@ window.TOOLS = [
   { cat: "Diagrams", icon: "FC", name: "Flowchart Builder", path: "tools/flowchart/index.html", svg: "flowchart",
     desc: "Draw process maps with swimlanes, decisions and connectors, or build one from a list of steps. Export to SVG, PDF, PNG or Mermaid.",
     tags: ["flowchart", "process", "visio", "diagram", "swimlane", "map"] },
+  { cat: "Planning", icon: "PP", name: "Project Planner", path: "tools/project-planner/index.html", svg: "project-planner",
+    desc: "Plan projects with tasks, a Kanban board, notes & decisions and a risks/issues log. Import plans from Markdown; save to a folder or GitHub.",
+    tags: ["project", "plan", "tasks", "kanban", "raid", "risks", "issues", "decisions", "github"] },
   { cat: "Admin", icon: "PW", name: "Random Password Generator", path: "tools/password/index.html", svg: "password",
     desc: "Easy-to-read Colour + Animal + number + symbol passwords, one at a time or in a batch.",
     tags: ["accounts", "password"] }

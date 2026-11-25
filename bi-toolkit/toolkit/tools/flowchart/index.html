@@ -6,6 +6,7 @@
 <title>Flowchart Builder · BI Toolkit</title>
 <script src="../../assets/boot.js"></script>
 <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 <link rel="stylesheet" href="../../assets/style.css">
 <style>
   main.wide { max-width: none; }
@@ -78,6 +79,8 @@
     <button id="exPdf">PDF</button>
     <button id="exPng">PNG</button>
     <button id="exMmd" title="Copy as Mermaid text">Mermaid</button>
+    <span class="sep"></span>
+    <button id="toProj" title="Attach this flowchart to a project in the Project Planner">Add to project…</button>
   </div>
 
   <div class="fc-wrap">
@@ -95,6 +98,13 @@
     </div>
     <div class="fc-props" id="props"></div>
   </div>
+
+  <dialog class="fc-dlg" id="projDlg">
+    <h2 style="margin-top:0">Add to a project</h2>
+    <p class="meta" style="margin-top:0">Attaches this flowchart to a project in the <a href="../project-planner/index.html">Project Planner</a>. It stays linked: changes you make here update the project's copy.</p>
+    <div id="projList"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button id="projCancel">Close</button></div>
+  </dialog>
 
   <dialog class="fc-dlg" id="textDlg">
     <h2 style="margin-top:0">Build from text</h2>
@@ -156,14 +166,36 @@ Check fees paid?             ending with ? = decision
     }
     doc = store.docs[store.cur].doc;
   }
-  var saveT;
+  var saveT, linkT, PSTORE = "bitk.projects.v1";
   function persist() {
     clearTimeout(saveT);
     saveT = setTimeout(function () {
       store.docs[store.cur] = { updated: Date.now(), doc: doc };
       try { localStorage.setItem(STORE, JSON.stringify(store)); } catch (e) {}
       fillDocs();
+      clearTimeout(linkT); linkT = setTimeout(syncLinked, 1200);
     }, 300);
+  }
+  // ---------- link to Project Planner ----------
+  function readProjects() { try { var s = JSON.parse(localStorage.getItem(PSTORE) || "null"); return s && s.projects ? s : null; } catch (e) { return null; } }
+  function snapshot() { var x = exportSVG(); try { return { svg: BITK_EXPORT.standalone(x.el), mermaid: mermaid() }; } finally { x.done(); } }
+  function syncLinked() { // keep the project copies of this flowchart up to date
+    var ps = readProjects(); if (!ps) return;
+    var hits = []; Object.keys(ps.projects).forEach(function (k) { (ps.projects[k].diagrams || []).forEach(function (d) { if (d.flowId === store.cur) hits.push([ps.projects[k], d]); }); });
+    if (!hits.length) return;
+    var snap = doc.nodes.length ? snapshot() : { svg: "", mermaid: "" }, now = new Date().toISOString();
+    hits.forEach(function (h) { h[1].doc = JSON.parse(JSON.stringify(doc)); h[1].name = doc.name; h[1].svg = snap.svg; h[1].mermaid = snap.mermaid; h[1].updated = now; h[0].updated = now; });
+    try { localStorage.setItem(PSTORE, JSON.stringify(ps)); } catch (e) {}
+  }
+  function addToProject(pid) {
+    var ps = readProjects(), p = ps && ps.projects[pid]; if (!p) return;
+    p.diagrams = p.diagrams || [];
+    var d = p.diagrams.filter(function (x) { return x.flowId === store.cur; })[0], now = new Date().toISOString();
+    if (!d) { d = { id: "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), flowId: store.cur, added: now }; p.diagrams.push(d); }
+    var snap = snapshot();
+    d.name = doc.name; d.doc = JSON.parse(JSON.stringify(doc)); d.svg = snap.svg; d.mermaid = snap.mermaid; d.updated = now; p.updated = now;
+    try { localStorage.setItem(PSTORE, JSON.stringify(ps)); } catch (e) { alert("Couldn't save: browser storage is full."); return; }
+    return p;
   }
   function change() { redo = []; undo.push(JSON.stringify(doc)); if (undo.length > 150) undo.shift(); }
   function undoIt() { if (!undo.length) return; redo.push(JSON.stringify(doc)); doc = JSON.parse(undo.pop()); store.docs[store.cur].doc = doc; clearSel(); render(); persist(); }
@@ -996,6 +1028,43 @@ Check fees paid?             ending with ? = decision
   $("exPng").addEventListener("click", function () { doExport("png"); });
   new MutationObserver(function () { fontFam = uiFont(); render(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   window.addEventListener("resize", function () { render(); });
+
+  $("toProj").addEventListener("click", function () {
+    var ps = readProjects(), L = $("projList");
+    if (!doc.nodes.length) { alert("Draw something first."); return; }
+    if (!ps || !Object.keys(ps.projects).length) { L.innerHTML = '<p>No projects yet. Create one in the <a href="../project-planner/index.html">Project Planner</a> first.</p>'; $("projDlg").showModal(); return; }
+    L.innerHTML = "";
+    Object.keys(ps.projects).map(function (k) { return ps.projects[k]; }).sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); }).forEach(function (p) {
+      var linked = (p.diagrams || []).some(function (d) { return d.flowId === store.cur; });
+      var row = document.createElement("div"); row.style.cssText = "display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)";
+      row.innerHTML = '<div style="flex:1"><strong>' + esc(p.name) + '</strong> <span class="meta">' + esc(p.status || "") + (linked ? " · already linked" : "") + "</span></div>";
+      var b = document.createElement("button"); b.textContent = linked ? "Update" : "Add"; if (!linked) b.className = "primary";
+      b.addEventListener("click", function () { var got = addToProject(p.id); if (got) { b.textContent = "Added ✓"; b.disabled = true; var a = document.createElement("a"); a.href = "../project-planner/index.html"; a.textContent = "Open project"; a.style.marginLeft = "8px"; a.addEventListener("click", function () { var s2 = readProjects(); if (s2) { s2.cur = p.id; localStorage.setItem(PSTORE, JSON.stringify(s2)); } }); row.appendChild(a); } });
+      row.appendChild(b); L.appendChild(row);
+    });
+    $("projDlg").showModal();
+  });
+  $("projCancel").addEventListener("click", function () { $("projDlg").close(); });
+  // another tab (e.g. the Project Planner) changed the saved flowcharts: take its copy, keep ours for the open one
+  window.addEventListener("storage", function (e) {
+    if (e.key !== STORE || !e.newValue || RENDER) return;
+    try { var ns = JSON.parse(e.newValue); if (!ns || !ns.docs) return; if (store.docs[store.cur]) ns.docs[store.cur] = store.docs[store.cur]; ns.cur = store.cur; store = ns; fillDocs(); } catch (x) {}
+  });
+
+  // Render mode: the Project Planner loads this page hidden and asks it to draw flowcharts.
+  var RENDER = /[?&]render=1/.test(location.search);
+  if (RENDER) {
+    doc = blank();
+    window.addEventListener("message", function (ev) {
+      var m = ev.data; if (!m || m.type !== "bitk-flow-render") return;
+      var out = { type: "bitk-flow-svg", id: m.id };
+      try { doc = m.doc || blank(); doc.nodes = doc.nodes || []; doc.edges = doc.edges || []; doc.lanes = doc.lanes || []; fontFam = uiFont(); var sn = doc.nodes.length ? snapshot() : { svg: "", mermaid: "" }; out.svg = sn.svg; out.mermaid = sn.mermaid; }
+      catch (err) { out.error = err.message; }
+      (ev.source || parent).postMessage(out, "*");
+    });
+    parent.postMessage({ type: "bitk-flow-ready" }, "*");
+    return;
+  }
 
   // handoff from the home page (.flow.json dropped there)
   var hand = window.BITK && BITK.take();
