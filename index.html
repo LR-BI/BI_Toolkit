@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BI Toolkit</title>
-<script src="assets/boot.js"></script>
-<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="assets/style.css">
+<script src="assets/boot.js?v=202611251150"></script>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=202611251150">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=202611251150">
+<link rel="stylesheet" href="assets/style.css?v=202611251150">
 </head>
 <body>
 <section class="home-hero">
@@ -40,9 +40,9 @@
   <div id="grid"></div>
   <p class="empty" id="empty" hidden>No tools match. Press Enter to check it as SQL instead.</p>
 </main>
-<footer>Source: <a href="https://github.com/lr-bi/lr-bi.github.io">github.com/lr-bi/lr-bi.github.io</a></footer>
+<footer>Version <a href="changelog/index.html" id="verLink">…</a> · Source: <a href="https://github.com/lr-bi/lr-bi.github.io">github.com/lr-bi/lr-bi.github.io</a></footer>
 
-<script src="assets/tools.js"></script>
+<script src="assets/tools.js?v=202611251150"></script>
 <script>
 (function () {
   var tools = window.TOOLS || [], cats = window.CATEGORIES || [];
@@ -163,10 +163,11 @@
   ["dragleave", "drop"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); if (ev === "drop" || e.target === document.documentElement) omni.classList.remove("over"); }); });
   document.addEventListener("drop", function (e) { readFiles(e.dataTransfer.files); });
   render();
+  if (window.BITK_VERSION) $("verLink").textContent = window.BITK_VERSION + " (what's new)";
 })();
 </script>
-<script src="assets/penguins.js"></script>
-<script src="assets/shell.js"></script>
-<script src="assets/howto.js"></script>
+<script src="assets/penguins.js?v=202611251150"></script>
+<script src="assets/shell.js?v=202611251150"></script>
+<script src="assets/howto.js?v=202611251150"></script>
 </body>
 </html>

@@ -21,17 +21,20 @@
 
   // Sidebar
   var side = el("aside", "sidebar");
-  var brand = el("a", "brand"); brand.href = root + "index.html";
-  var logo = el("img", "logo"); logo.src = root + "assets/favicon.svg"; logo.alt = ""; brand.appendChild(logo);
+  var brand = el("div", "brand"), bh = el("a", "bhome"); bh.href = root + "index.html";
+  var logo = el("img", "logo"); logo.src = root + "assets/favicon.svg"; logo.alt = ""; bh.appendChild(logo);
   var bt = el("span", "bt"); bt.appendChild(el("span", "bn", "BI Toolkit")); bt.appendChild(el("span", "bs", "Developed by LR"));
-  brand.appendChild(bt); side.appendChild(brand);
+  bh.appendChild(bt); brand.appendChild(bh);
+  if (window.BITK_VERSION) { var ver = el("a", "ver", "v" + window.BITK_VERSION); ver.href = root + "changelog/index.html"; ver.title = "What's new: changelog"; brand.appendChild(ver); }
+  side.appendChild(brand);
 
   var sw = el("div", "sidesearch");
   var si = el("input"); si.type = "search"; si.placeholder = "Search tools…"; si.setAttribute("aria-label", "Search tools");
   sw.appendChild(si); sw.appendChild(el("kbd", "", "Ctrl K")); side.appendChild(sw);
 
   var nav = el("nav", "sidenav");
-  var home = el("a", "item" + (current ? "" : " on")); home.href = root + "index.html";
+  var page = current || window.BITK_PAGE || null;   // a tool, or a non-tool page such as the changelog
+  var home = el("a", "item" + (page ? "" : " on")); home.href = root + "index.html";
   var hi = el("span", "sic home"); hi.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>'; home.appendChild(hi); home.appendChild(el("span", "", "Home")); nav.appendChild(home);
   var groups = [];
   cats.forEach(function (c) {
@@ -67,7 +70,7 @@
   menu.addEventListener("click", function () { document.body.classList.toggle("side-open"); });
   bar.appendChild(menu);
   var crumb = el("div", "crumb");
-  if (current) { crumb.appendChild(el("span", "cn", current.name)); crumb.appendChild(el("span", "cd", current.desc)); }
+  if (page) { crumb.appendChild(el("span", "cn", page.name)); crumb.appendChild(el("span", "cd", page.desc)); }
   else { crumb.appendChild(el("span", "cn", "Home")); crumb.appendChild(el("span", "cd", "Small tools for SQL Server, EBS, ILR and SSRS work")); }
   bar.appendChild(crumb);
   var acts = el("div", "baracts");
@@ -105,7 +108,7 @@
 
   // Penguin-shaped tab cut into the sidebar edge, with the page name written down it
   (function () {
-    var label = current ? current.name : "Home", NS = "http://www.w3.org/2000/svg";
+    var label = page ? page.name : "Home", NS = "http://www.w3.org/2000/svg";
     var cv = document.createElement("canvas").getContext("2d"); cv.font = "600 14px " + getComputedStyle(document.body).fontFamily;
     var len = Math.ceil(cv.measureText(label).width) + 10, W = 58, B = Math.max(30, len - 40), H = 140 + B;
     // Left-facing standing penguin; everything to its right is open to the page

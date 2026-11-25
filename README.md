@@ -59,3 +59,7 @@ No server needed: unzip or clone, then double-click `index.html`. Links use `ind
 | Ontrack Field Helper | `tools/ontrack-helper/` |
 | Query ERD | `tools/query-erd/` |
 | SSRS Expression Checker | `tools/ssrs-expressions/` (checks shared via `assets/ssrs-expr.js`) |
+
+## Versions
+
+The version number and changelog live at the bottom of `assets/tools.js` (`BITK_VERSION` and `CHANGELOG`); the changelog page is `changelog/index.html`. For each release, bump the version, add an entry at the top, and change the `?v=` number on asset links so browsers fetch the new files.

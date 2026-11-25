@@ -86,3 +86,44 @@ window.TOOLS = [
     desc: "Easy-to-read Colour + Animal + number + symbol passwords, one at a time or in a batch.",
     tags: ["accounts", "password"] }
 ];
+
+// ---- Version and changelog (newest first). Bump BITK_VERSION and add an entry for each release. ----
+window.BITK_VERSION = "1.5.0";
+window.CHANGELOG = [
+  { v: "1.5.0", date: "25 Nov 2026", title: "Home page refresh", items: [
+    "Tool groups on the home page open and close (it remembers), with Open all / Close all; searching shows one list of matches",
+    "Background of falling ASCII penguins at random sizes and speeds (still for reduced-motion settings, pauses when the tab is hidden)",
+    "Contrast checked in light and dark: title colours, faded text and footer fixed",
+    "Scrollbars back on tool pages (thin, themed); still hidden in the sidebar",
+    "Version number and this changelog; files carry a version so browsers fetch new copies after an update"
+  ] },
+  { v: "1.4.0", date: "25 Nov 2026", title: "EBS and live-data tools", items: [
+    "New: EBS Validator Fixer: OUTER/CROSS APPLY to scalar subqueries or joins, STRING_AGG to STUFF(FOR XML PATH); Fix for EBS button in SQL Checker and Project Planner",
+    "New: Safe Change Script: preview, backup table, transaction, row-count check, dry run, log table and undo script",
+    "New: Ontrack Page Builder: rule-based CustomHTML script (defaults, show/hide, required, locks, ULN/NI checks, grid colours, banners, buttons, after-save), F12 helpers, test plan"
+  ] },
+  { v: "1.3.0", date: "24 Nov 2026", title: "Notes blocks", items: [
+    "New: SQL Notes Block: house-style header with dated change log and notes, suggestions from the query, fictional examples",
+    "Notes block buttons in SQL Checker and Project Planner, with Save back",
+    "Sidebar says \"Developed by LR\""
+  ] },
+  { v: "1.2.0", date: "24 Nov 2026", title: "Project Planner", items: [
+    "New: Project Planner: tasks, Kanban board, notes & decisions, risks & issues, forecast and RAG status",
+    "Markdown import/export, AI prompt export for other assistants, outline write-ups",
+    "Save to a folder on your computer or to GitHub; open older projects from GitHub",
+    "SQL store per project (with history) and diagrams from the Flowchart Builder"
+  ] },
+  { v: "1.1.0", date: "23 Nov 2026", title: "Domain, diagrams and a stronger checker", items: [
+    "Moved to tools.lwr.fyi",
+    "ASCII penguin favicon and app icon",
+    "SQL Checker runs seven steps",
+    "Query ERD exports SVG, PDF and PNG, and traces a column",
+    "New: Flowchart Builder: swimlanes, decisions, build from text, export SVG/PDF/PNG/Mermaid"
+  ] },
+  { v: "1.0.0", date: "Nov 2026", title: "First version", items: [
+    "One site for the toolkit, sidebar, search (Ctrl+K), light and dark themes, drop a file on the home page",
+    "SQL Checker, Query Plan Reader, Schema Map, Query ERD, Result Set Diff, List to SQL",
+    "Academic Year & ILR Dates, Workflow Viewer, Learner Digit Checker, Ontrack Field Helper",
+    "SSRS Report Inspector, SSRS Expression Checker, Excel to SSRS Width Converter, Random Password Generator"
+  ] }
+];

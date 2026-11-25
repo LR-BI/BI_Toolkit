@@ -48,7 +48,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 /* ---------- Shell: sidebar + page bar ---------- */
 body.shell { display: grid; grid-template-columns: var(--sidew) minmax(0, 1fr); min-height: 100vh; }
 .sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--side); color: var(--side-text); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 30; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 12px 14px; text-decoration: none; color: var(--side-text); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 8px; padding: 12px 14px; color: var(--side-text); border-bottom: 1px solid var(--border); }
+.brand .bhome { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-decoration: none; color: inherit; }
+.brand .ver { flex: none; font-size: 11.5px; text-decoration: none; color: var(--side-text); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; background: var(--side); }
+.brand .ver:hover { border-color: var(--accent-2); color: var(--link); }
 .brand .logo { width: 36px; height: 36px; border-radius: 8px; flex: none; display: block; }
 .brand .bt { display: flex; flex-direction: column; line-height: 1.15; }
 .brand .bn { font-weight: 700; font-size: 17px; }
@@ -248,3 +251,14 @@ footer { max-width: var(--page); margin: 0 auto; padding: 0 1.5rem 2rem; font-si
 .penguin-tab:hover .outline { stroke: var(--accent-2); }
 @media (max-height: 520px) { .penguin-tab { display: none; } }
 .hint { color: var(--muted); font-size: 13px; }
+
+/* Changelog */
+.clog { max-width: 820px; }
+.clog .rel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); margin: 0 0 14px; }
+.clog .rel > h2 { margin: 0; padding: 10px 14px; font-size: 17px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.clog .rel > h2 .v { color: var(--link); }
+.clog .rel > h2 .dt { margin-left: auto; font-size: 13px; font-weight: 400; color: var(--muted); }
+.clog .rel.cur > h2::after { content: "current"; font-size: 11px; font-weight: 600; background: var(--accent); color: var(--accent-text); border-radius: 999px; padding: 1px 8px; order: 2; }
+.clog .rel ul { margin: 10px 0 12px; padding-left: 32px; }
+.clog .rel li { margin: 4px 0; }
+.clog .rel li.new::marker { color: var(--accent-2); }
