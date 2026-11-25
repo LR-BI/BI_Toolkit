@@ -88,8 +88,11 @@ window.TOOLS = [
 ];
 
 // ---- Version and changelog (newest first). Bump BITK_VERSION and add an entry for each release. ----
-window.BITK_VERSION = "1.2.0";
+window.BITK_VERSION = "1.2.1";
 window.CHANGELOG = [
+  { v: "1.2.1", date: "25 Nov 2026", title: "Fix: GitHub save errors", items: [
+    "Project Planner retries a GitHub save when GitHub answers with a server error (500), and says which file failed if it still can't"
+  ] },
   { v: "1.2.0", date: "25 Nov 2026", title: "Screens in projects", items: [
     "Project Planner: new Screens tab for Screen Designer exports (.uafx): page versions, DataLinks, layout, custom HTML and notes",
     "Checks each screen for validator problems, hard-coded dates, expander columns, writeback tables and access groups",

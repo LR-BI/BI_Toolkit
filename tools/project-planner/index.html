@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Planner · BI Toolkit</title>
-<script src="../../assets/boot.js?v=202611251521"></script>
-<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251521">
-<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251521">
-<link rel="stylesheet" href="../../assets/style.css?v=202611251521">
+<script src="../../assets/boot.js?v=202611251559"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251559">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251559">
+<link rel="stylesheet" href="../../assets/style.css?v=202611251559">
 <style>
   main.wide { max-width: none; }
   .pp-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0 12px; }
@@ -183,7 +183,7 @@
   <dialog class="pp-dlg" id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
 </main>
 
-<script src="uafx.js?v=202611251521"></script>
+<script src="uafx.js?v=202611251559"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -1331,17 +1331,30 @@
       if (r.status === 401) t = "the token was refused. It may have expired or been revoked; make a new one (GitHub… → How to get a token)";
       else if (r.status === 403 && method !== "GET") t = "the token can't write to this repo. Check it has Contents: Read and write for " + c.repo;
       else if (r.status === 404 && method !== "GET") t = "repo not found. Check the owner and repo name, and that the token can see this repo";
+      if (!t && r.status >= 500) t = "GitHub had a server error";
       throw new Error(r.status + " " + (t || r.statusText));
     }
     return r.status === 204 ? {} : r.json();
   }
   function ghPath(p, file) { var c = ghCfg(), base = (c.path || "projects").replace(/^\/+|\/+$/g, ""); if (!p.folder) p.folder = slug(p.name) + "-" + p.id.slice(-4); return (base ? base + "/" : "") + p.folder + "/" + file; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // GitHub sometimes answers 500/502/409 when several commits land close together: wait, re-read the file's sha and try again
   async function ghPut(path, text, msg) {
-    var c = ghCfg(), enc = path.split("/").map(encodeURIComponent).join("/");
-    var cur = await gh("GET", "/contents/" + enc + "?ref=" + encodeURIComponent(c.branch || "main"));
-    var body = { message: msg, content: b64(text), branch: c.branch || "main" }; if (cur && cur.sha) body.sha = cur.sha;
-    if (cur && cur.content && unb64(cur.content) === text) return false;
-    await gh("PUT", "/contents/" + enc, body); return true;
+    var c = ghCfg(), enc = path.split("/").map(encodeURIComponent).join("/"), content = b64(text);
+    for (var attempt = 1; ; attempt++) {
+      try {
+        var cur = await gh("GET", "/contents/" + enc + "?ref=" + encodeURIComponent(c.branch || "main"));
+        if (cur && cur.content && unb64(cur.content) === text) return false;
+        var body = { message: msg, content: content, branch: c.branch || "main" }; if (cur && cur.sha) body.sha = cur.sha;
+        await gh("PUT", "/contents/" + enc, body);
+        await wait(250);                                  // space out commits
+        return true;
+      } catch (e) {
+        var st = parseInt(e.message, 10);
+        if (attempt < 4 && (st >= 500 || st === 409 || st === 422 || isNaN(st))) { ghMsg = "GitHub busy, retrying " + path.split("/").pop() + "…"; syncState(); await wait(1000 * Math.pow(2, attempt - 1)); continue; }
+        throw new Error(e.message + " (while saving " + path + ")");
+      }
+    }
   }
   async function ghSave(all) {
     var list = all ? Object.keys(db.projects).map(function (k) { return db.projects[k]; }) : [P()];
@@ -1497,9 +1510,9 @@
   window.__pp = { get db() { return db; }, fromMarkdown: fromMarkdown, toMarkdown: toMarkdown, parseQuick: parseQuick, forecast: forecast, rag: rag, DOCS: DOCS, claudePrompt: claudePrompt, aiPrompt: aiPrompt, renderFlow: renderFlow };
 })();
 </script>
-<script src="../../assets/export.js?v=202611251521"></script>
-<script src="../../assets/tools.js?v=202611251521"></script>
-<script src="../../assets/shell.js?v=202611251521"></script>
-<script src="../../assets/howto.js?v=202611251521"></script>
+<script src="../../assets/export.js?v=202611251559"></script>
+<script src="../../assets/tools.js?v=202611251559"></script>
+<script src="../../assets/shell.js?v=202611251559"></script>
+<script src="../../assets/howto.js?v=202611251559"></script>
 </body>
 </html>
