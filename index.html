@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BI Toolkit</title>
-<script src="assets/boot.js?v=202611251150"></script>
-<link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=202611251150">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=202611251150">
-<link rel="stylesheet" href="assets/style.css?v=202611251150">
+<script src="assets/boot.js?v=202611251421"></script>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=202611251421">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=202611251421">
+<link rel="stylesheet" href="assets/style.css?v=202611251421">
 </head>
 <body>
 <section class="home-hero">
@@ -22,7 +22,7 @@
       </div>
     </div>
     <input type="file" id="homefile" multiple hidden>
-    <div class="omni-msg"><span id="omsg"></span><span>.sqlplan · .rdl · .xoml · .xaml · .rules · .sql · .flow.json</span></div>
+    <div class="omni-msg"><span id="omsg"></span><span>.sqlplan · .rdl · .xoml · .xaml · .rules · .sql · .flow.json · React Flow JSON</span></div>
   </div>
 </section>
 <main>
@@ -42,7 +42,7 @@
 </main>
 <footer>Version <a href="changelog/index.html" id="verLink">…</a> · Source: <a href="https://github.com/lr-bi/lr-bi.github.io">github.com/lr-bi/lr-bi.github.io</a></footer>
 
-<script src="assets/tools.js?v=202611251150"></script>
+<script src="assets/tools.js?v=202611251421"></script>
 <script>
 (function () {
   var tools = window.TOOLS || [], cats = window.CATEGORIES || [];
@@ -100,6 +100,7 @@
     if (/\.(xoml|xaml|rules)$/.test(name) || /<(SequentialWorkflowActivity|StateMachineWorkflowActivity|RuleDefinitions|Activity)\b/.test(t) || /schemas\.microsoft\.com\/(winfx\/2006\/xaml\/workflow|netfx\/2009\/xaml\/activities)/.test(t)) return "wf";
     if (/\.project\.json$/.test(name) || /"bitkProject"\s*:\s*1/.test(t)) return "project";
     if (/\.flow\.json$/.test(name) || /^\s*\{\s*"bitkFlow"/.test(t)) return "flow";
+    if (/^\s*\{/.test(t) && /"nodes"\s*:/.test(t) && /"(source|edges)"\s*:/.test(t)) return "flow";   // React Flow / xyflow JSON
     if (/\.sql$/.test(name) || /^\s*(--|\/\*|SELECT\b|WITH\b|UPDATE\b|INSERT\b|DELETE\b|DECLARE\b|MERGE\b|CREATE\b|ALTER\b|EXEC\b|IF\b|SET\b|USE\b)/i.test(t)) return "sql";
     return null;
   }
@@ -166,8 +167,8 @@
   if (window.BITK_VERSION) $("verLink").textContent = window.BITK_VERSION + " (what's new)";
 })();
 </script>
-<script src="assets/penguins.js?v=202611251150"></script>
-<script src="assets/shell.js?v=202611251150"></script>
-<script src="assets/howto.js?v=202611251150"></script>
+<script src="assets/penguins.js?v=202611251421"></script>
+<script src="assets/shell.js?v=202611251421"></script>
+<script src="assets/howto.js?v=202611251421"></script>
 </body>
 </html>

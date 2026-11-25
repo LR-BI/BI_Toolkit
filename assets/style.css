@@ -254,11 +254,15 @@ footer { max-width: var(--page); margin: 0 auto; padding: 0 1.5rem 2rem; font-si
 
 /* Changelog */
 .clog { max-width: 820px; }
-.clog .rel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); margin: 0 0 14px; }
-.clog .rel > h2 { margin: 0; padding: 10px 14px; font-size: 17px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
-.clog .rel > h2 .v { color: var(--link); }
-.clog .rel > h2 .dt { margin-left: auto; font-size: 13px; font-weight: 400; color: var(--muted); }
-.clog .rel.cur > h2::after { content: "current"; font-size: 11px; font-weight: 600; background: var(--accent); color: var(--accent-text); border-radius: 999px; padding: 1px 8px; order: 2; }
+.clog .rel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); margin: 0 0 10px; padding: 0; }
+.clog .rel > summary { cursor: pointer; list-style: none; margin: 0; font-weight: 600; padding: 10px 14px; font-size: 17px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.clog .rel > summary .v { color: var(--link); }
+.clog .rel > summary .dt { margin-left: auto; font-size: 13px; font-weight: 400; color: var(--muted); }
+.clog .rel.cur > summary::after { content: "current"; font-size: 11px; font-weight: 600; background: var(--accent); color: var(--accent-text); border-radius: 999px; padding: 1px 8px; order: 2; }
+.clog .rel > summary::-webkit-details-marker { display: none; }
+.clog .rel > summary::before { content: "\25B6"; font-size: 11px; color: var(--muted); transition: transform .15s; }
+.clog .rel[open] > summary::before { transform: rotate(90deg); }
+.clog .rel:not([open]) > summary { border-bottom: 0; }
 .clog .rel ul { margin: 10px 0 12px; padding-left: 32px; }
 .clog .rel li { margin: 4px 0; }
 .clog .rel li.new::marker { color: var(--accent-2); }

@@ -4,27 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Changelog · BI Toolkit</title>
-<script src="../assets/boot.js?v=202611251150"></script>
-<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg?v=202611251150">
-<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png?v=202611251150">
-<link rel="stylesheet" href="../assets/style.css?v=202611251150">
+<script src="../assets/boot.js?v=202611251421"></script>
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg?v=202611251421">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png?v=202611251421">
+<link rel="stylesheet" href="../assets/style.css?v=202611251421">
 <script>window.BITK_PAGE = { name: "Changelog", desc: "What changed in each version" };</script>
 </head>
 <body>
 <main class="clog">
   <h1>Changelog</h1>
   <p class="lead" id="lead"></p>
-  <p class="meta" style="margin-top:-.5rem">Versions before 1.5.0 are pieced together after the fact, so dates and the split between versions are approximate.</p>
+  <p class="meta" style="margin-top:-.5rem">Click a version to open or close it.</p>
   <div id="list"></div>
 </main>
-<script src="../assets/tools.js?v=202611251150"></script>
+<script src="../assets/tools.js?v=202611251421"></script>
 <script>
 (function () {
   var log = window.CHANGELOG || [], L = document.getElementById("list");
   document.getElementById("lead").textContent = "You're on version " + (window.BITK_VERSION || "?") + ". Newest changes first.";
   log.forEach(function (r, i) {
-    var d = document.createElement("section"); d.className = "rel" + (i === 0 ? " cur" : ""); d.id = "v" + r.v;
-    var h = document.createElement("h2");
+    var d = document.createElement("details"); d.className = "rel" + (i === 0 ? " cur" : ""); d.id = "v" + r.v; d.open = i === 0;
+    var h = document.createElement("summary");
     var v = document.createElement("span"); v.className = "v"; v.textContent = "v" + r.v;
     var t = document.createElement("span"); t.textContent = r.title;
     var dt = document.createElement("span"); dt.className = "dt"; dt.textContent = r.date;
@@ -35,6 +35,6 @@
   });
 })();
 </script>
-<script src="../assets/shell.js?v=202611251150"></script>
+<script src="../assets/shell.js?v=202611251421"></script>
 </body>
 </html>

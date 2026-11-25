@@ -88,42 +88,23 @@ window.TOOLS = [
 ];
 
 // ---- Version and changelog (newest first). Bump BITK_VERSION and add an entry for each release. ----
-window.BITK_VERSION = "1.5.0";
+window.BITK_VERSION = "1.1.2";
 window.CHANGELOG = [
-  { v: "1.5.0", date: "25 Nov 2026", title: "Home page refresh", items: [
-    "Tool groups on the home page open and close (it remembers), with Open all / Close all; searching shows one list of matches",
-    "Background of falling ASCII penguins at random sizes and speeds (still for reduced-motion settings, pauses when the tab is hidden)",
-    "Contrast checked in light and dark: title colours, faded text and footer fixed",
-    "Scrollbars back on tool pages (thin, themed); still hidden in the sidebar",
-    "Version number and this changelog; files carry a version so browsers fetch new copies after an update"
+  { v: "1.1.2", date: "25 Nov 2026", title: "Fix: delete diagram", items: [
+    "Flowchart Builder: Delete this diagram works (it used to come straight back)"
   ] },
-  { v: "1.4.0", date: "25 Nov 2026", title: "EBS and live-data tools", items: [
-    "New: EBS Validator Fixer: OUTER/CROSS APPLY to scalar subqueries or joins, STRING_AGG to STUFF(FOR XML PATH); Fix for EBS button in SQL Checker and Project Planner",
-    "New: Safe Change Script: preview, backup table, transaction, row-count check, dry run, log table and undo script",
-    "New: Ontrack Page Builder: rule-based CustomHTML script (defaults, show/hide, required, locks, ULN/NI checks, grid colours, banners, buttons, after-save), F12 helpers, test plan"
+  { v: "1.1.1", date: "25 Nov 2026", title: "Flowchart import", items: [
+    "Flowchart Builder opens React Flow JSON (nodes + edges), by Open file, paste into From text, or drop on the home page"
   ] },
-  { v: "1.3.0", date: "24 Nov 2026", title: "Notes blocks", items: [
-    "New: SQL Notes Block: house-style header with dated change log and notes, suggestions from the query, fictional examples",
-    "Notes block buttons in SQL Checker and Project Planner, with Save back",
-    "Sidebar says \"Developed by LR\""
-  ] },
-  { v: "1.2.0", date: "24 Nov 2026", title: "Project Planner", items: [
-    "New: Project Planner: tasks, Kanban board, notes & decisions, risks & issues, forecast and RAG status",
-    "Markdown import/export, AI prompt export for other assistants, outline write-ups",
-    "Save to a folder on your computer or to GitHub; open older projects from GitHub",
-    "SQL store per project (with history) and diagrams from the Flowchart Builder"
-  ] },
-  { v: "1.1.0", date: "23 Nov 2026", title: "Domain, diagrams and a stronger checker", items: [
-    "Moved to tools.lwr.fyi",
-    "ASCII penguin favicon and app icon",
-    "SQL Checker runs seven steps",
-    "Query ERD exports SVG, PDF and PNG, and traces a column",
-    "New: Flowchart Builder: swimlanes, decisions, build from text, export SVG/PDF/PNG/Mermaid"
+  { v: "1.1.0", date: "25 Nov 2026", title: "Big update", items: [
+    "New: Project Planner: tasks, board, notes, risks & issues, forecast, SQL store and diagrams; save to a folder or GitHub",
+    "New: Flowchart Builder: swimlanes, decisions, build from text, export SVG/PDF/PNG/Mermaid",
+    "New: SQL Notes Block, EBS Validator Fixer, Safe Change Script, Ontrack Page Builder",
+    "SQL Checker runs seven steps; Query ERD exports and traces columns",
+    "Home page: tool groups open and close, falling penguin background",
+    "Moved to tools.lwr.fyi with the penguin icon; contrast and scrollbar fixes"
   ] },
   { v: "1.0.0", date: "Nov 2026", title: "First version", items: [
-    "One site for the toolkit, sidebar, search (Ctrl+K), light and dark themes, drop a file on the home page",
-    "SQL Checker, Query Plan Reader, Schema Map, Query ERD, Result Set Diff, List to SQL",
-    "Academic Year & ILR Dates, Workflow Viewer, Learner Digit Checker, Ontrack Field Helper",
-    "SSRS Report Inspector, SSRS Expression Checker, Excel to SSRS Width Converter, Random Password Generator"
+    "One site for the toolkit: 14 tools for SQL Server, EBS/ILR and SSRS, with search and light/dark themes"
   ] }
 ];

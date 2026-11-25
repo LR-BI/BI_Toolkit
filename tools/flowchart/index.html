@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flowchart Builder · BI Toolkit</title>
-<script src="../../assets/boot.js?v=202611251150"></script>
-<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251150">
-<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251150">
-<link rel="stylesheet" href="../../assets/style.css?v=202611251150">
+<script src="../../assets/boot.js?v=202611251421"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg?v=202611251421">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png?v=202611251421">
+<link rel="stylesheet" href="../../assets/style.css?v=202611251421">
 <style>
   main.wide { max-width: none; }
   .fc-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0 10px; }
@@ -53,6 +53,7 @@
       <li><strong>Connect:</strong> hover a shape and drag from one of its dots onto another shape. Drop on empty space to create and connect a new step in one go. Or select a shape and click a <strong>+</strong> to add the next step in that direction.</li>
       <li><strong>Move around:</strong> drag empty space to pan, <kbd>Ctrl</kbd> + mouse wheel to zoom, <strong>Fit</strong> to see everything. <kbd>Shift</kbd>+drag on empty space selects several shapes; <kbd>Shift</kbd>+click adds to the selection.</li>
       <li><strong>Swimlanes:</strong> click <strong>Add lane</strong> (with nothing selected). Double-click a lane's name to rename it; drag its bottom edge to resize.</li>
+      <li><strong>Open file</strong> also reads React Flow / xyflow JSON (<code>nodes</code> + <code>edges</code>): input/output nodes become start/end shapes, and a label starting <code>DECISION:</code> becomes a diamond. You can paste that JSON into <strong>From text</strong> too.</li>
       <li><strong>From text</strong> builds a whole chart from a list of steps (see the help inside). <strong>Tidy</strong> lays out the current chart neatly.</li>
       <li>Shortcuts: <kbd>Delete</kbd> remove, <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo, <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd>/<kbd>D</kbd> copy/paste/duplicate, arrow keys nudge, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all.</li>
       <li>Your diagrams save automatically in this browser. Use <strong>Save file</strong> to keep a copy or send it to someone; they open it with <strong>Open file</strong>.</li>
@@ -129,7 +130,7 @@ Check fees paid?             ending with ? = decision
   </dialog>
 </main>
 
-<script src="../../assets/export.js?v=202611251150"></script>
+<script src="../../assets/export.js?v=202611251421"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -759,7 +760,14 @@ Check fees paid?             ending with ? = decision
     var r9 = el("div", { "class": "row" }); P.appendChild(lab("")); P.appendChild(r9);
     r9.appendChild(btn("Delete this diagram", function () {
       if (!confirm("Delete \"" + doc.name + "\" from this browser? Save it as a file first if you want to keep it.")) return;
-      delete store.docs[store.cur]; store.cur = null; load(); undo = []; redo = []; clearSel(); fit(); persist();
+      clearTimeout(saveT); closeEdit(false);
+      delete store.docs[store.cur];
+      var ids = Object.keys(store.docs).sort(function (a, b) { return (store.docs[b].updated || 0) - (store.docs[a].updated || 0); });
+      if (ids.length) store.cur = ids[0];                                  // open the most recent one left
+      else { store.cur = "d" + Date.now(); store.docs[store.cur] = { updated: Date.now(), doc: blank() }; }
+      doc = store.docs[store.cur].doc;
+      try { localStorage.setItem(STORE, JSON.stringify(store)); } catch (e) {}   // save now, so nothing brings it back
+      undo = []; redo = []; clearSel(); fillDocs(); fit();
     }));
     P.appendChild(el("p", { "class": "hint" }, "Click a shape to change it. Double-click empty space to add a step there."));
   }
@@ -787,15 +795,53 @@ Check fees paid?             ending with ? = decision
     r.onload = function () { openText(r.result, f.name); };
     r.readAsText(f); this.value = "";
   });
+  // React Flow / xyflow JSON ({nodes:[{id,type,position,data:{label},style}], edges:[{source,target,label}]}) -> our format
+  function isReactFlow(d) { return d && Array.isArray(d.nodes) && (d.nodes.some(function (n) { return n && (n.position || n.data); }) || (d.edges || []).some(function (e) { return e && e.source; })); }
+  function fromReactFlow(d) {
+    var nodes = [], edges = [], ids = {};
+    function clean(c) { c = String(c || "").replace(/[`'"\s]/g, ""); return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c) ? c : ""; }
+    function num(v, dflt) { var n = parseFloat(v); return isNaN(n) ? dflt : n; }
+    d.nodes.forEach(function (n, i) {
+      if (!n || n.id == null) return;
+      var lbl = n.data && n.data.label != null ? String(n.data.label) : (n.label != null ? String(n.label) : String(n.id));
+      var st = n.style || {}, type = "process", m;
+      if ((m = /^\s*(DECISION|DECIDE|IF)\s*:\s*/i.exec(lbl))) { type = "decision"; lbl = lbl.slice(m[0].length); }
+      else if (/\?\s*$/.test(lbl.split("\n")[0]) && !/\n/.test(lbl)) type = "decision";
+      else if (n.type === "input" || n.type === "output") type = "terminator";
+      var w = num(st.width, num(n.width, n.measured && n.measured.width || 180));
+      if (type === "decision") w = Math.max(w * 1.15, 190);
+      var o = { id: "n" + (i + 1), type: type, text: lbl, x: Math.round(num(n.position && n.position.x, i * 40)), y: Math.round(num(n.position && n.position.y, i * 90)), w: Math.round(w),
+        h: Math.round(Math.max(type === "decision" ? 80 : 44, num(st.height, num(n.height, n.measured && n.measured.height || 56)))) };
+      var bg = clean(st.background || st.backgroundColor); if (bg && !/^#fff(fff)?$/i.test(bg)) o.fill = bg;
+      if (type === "decision") { var ow = num(st.width, o.w), oh = num(st.height, o.h); o.x = Math.round(o.x - (o.w - ow) / 2); o.y = Math.round(o.y - (o.h - oh) / 2); }   // widened diamond keeps its centre
+      ids[n.id] = o.id; nodes.push(o);
+    });
+    (d.edges || []).forEach(function (e, i) {
+      if (!e || ids[e.source] == null || ids[e.target] == null) return;
+      edges.push({ id: "e" + (i + 1), from: ids[e.source], to: ids[e.target], label: e.label != null ? String(e.label) : "" });
+    });
+    return { name: d.name || "", nodes: nodes, edges: edges, lanes: [], dir: "TB", imported: "reactflow" };
+  }
+  function toastMsg(m) {
+    var t = document.createElement("div"); t.textContent = m; t.setAttribute("role", "status");
+    t.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:50;max-width:420px;padding:10px 14px;border-radius:8px;background:var(--accent);color:var(--accent-text);box-shadow:0 4px 18px rgba(0,0,0,.25);font-size:14px";
+    document.body.appendChild(t); setTimeout(function () { t.remove(); }, 6000);
+  }
   function openText(text, fname) {
     try {
-      var j = JSON.parse(text), d = j.doc || j;
-      if (!d || !Array.isArray(d.nodes)) throw new Error("not a flowchart file");
+      var j = JSON.parse(text), d = j.doc || j, rf = isReactFlow(d);
+      if (rf) d = fromReactFlow(d);
+      if (d && Array.isArray(d.nodes)) d.nodes.forEach(function (n) {   // tolerate hand-written files
+        n.type = n.type || "process"; n.text = n.text != null ? String(n.text) : ""; n.x = +n.x || 0; n.y = +n.y || 0;
+        if (!(+n.w > 0)) n.w = 180; else n.w = +n.w; if (!(+n.h > 0)) n.h = n.type === "decision" ? 80 : 56; else n.h = +n.h;
+      });
+      if (!d || !Array.isArray(d.nodes) || !d.nodes.length) throw new Error("no shapes found");
       d.edges = d.edges || []; d.lanes = d.lanes || []; d.name = d.name || (fname || "Imported").replace(/\.flow\.json$|\.json$/i, "");
       store.docs[store.cur] = { updated: Date.now(), doc: doc };
       store.cur = "d" + Date.now(); doc = d; store.docs[store.cur] = { updated: Date.now(), doc: doc };
       undo = []; redo = []; clearSel(); fit(); persist(); fillDocs();
-    } catch (e) { alert("That file isn't a flowchart saved from this tool (" + e.message + ")."); }
+      if (rf) toastMsg("Imported " + d.nodes.length + " shapes and " + d.edges.length + " arrows from React Flow JSON. Positions kept; click Tidy to re-lay it out.");
+    } catch (e) { alert("Couldn't open that JSON (" + e.message + "). This accepts flowcharts saved from this tool and React Flow / xyflow JSON with nodes and edges."); }
   }
 
   // ---------- Mermaid ----------
@@ -921,6 +967,7 @@ Check fees paid?             ending with ? = decision
   $("textCancel").addEventListener("click", function () { $("textDlg").close(); });
   $("textGo").addEventListener("click", function () {
     var t = $("textIn").value;
+    if (/^\s*\{/.test(t)) { $("textDlg").close(); openText(t, "Pasted JSON"); return; }   // pasted JSON instead of steps
     try { var d = fromText(t); } catch (e) { alert(e.message); return; }
     if (!d.nodes.length) { alert("Write at least one step."); return; }
     store.lastText = t;
@@ -1075,8 +1122,8 @@ Check fees paid?             ending with ? = decision
   window.__fc = { get doc() { return doc; }, fromText: fromText, mermaid: mermaid, tidy: tidy, render: render, sel: function () { return sel; } };
 })();
 </script>
-<script src="../../assets/tools.js?v=202611251150"></script>
-<script src="../../assets/shell.js?v=202611251150"></script>
-<script src="../../assets/howto.js?v=202611251150"></script>
+<script src="../../assets/tools.js?v=202611251421"></script>
+<script src="../../assets/shell.js?v=202611251421"></script>
+<script src="../../assets/howto.js?v=202611251421"></script>
 </body>
 </html>
