@@ -6,6 +6,7 @@
 <title>SQL Checker · BI Toolkit</title>
 <script src="../../assets/boot.js"></script>
 <link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
 <link rel="stylesheet" href="../../assets/style.css">
 <style>
   #sql { min-height: 300px; font-size: 13px; line-height: 1.5; tab-size: 4; }
@@ -33,6 +34,7 @@
   <details class="howto"><summary>How to use</summary>
     <ol>
       <li>Paste a query into the box. Checks run as you type.</li>
+      <li><strong>Save to project…</strong> keeps the query in a project in the <a href="../project-planner/index.html">Project Planner</a> (its SQL tab). If you opened the query from a project, <strong>Save back</strong> updates it there.</li>
       <li>The row of numbered steps shows what was checked: ✓ means that step passed, a number means it found something (click it to jump there).</li>
       <li>Results are <strong>errors</strong> (SQL Server will reject it, or it's almost always wrong), <strong>warnings</strong> (often wrong, check them) and <strong>tips</strong> (performance or style). Untick <strong>Show tips</strong> to hide tips.</li>
       <li>Load your database in the <a href="../schema-map/index.html">Schema Map</a> tool to switch on step 6: it then checks that every table and column exists, suggests the right name for typos, and spots text compared with number columns.</li>
@@ -48,6 +50,10 @@
     <button id="sampleBtn">Load sample</button>
     <button id="clearBtn">Clear</button>
     <button id="erdBtn">Show joins (Query ERD)</button>
+    <button id="backBtn" class="primary" hidden></button>
+    <button id="projBtn" title="Keep this query in a project in the Project Planner">Save to project…</button>
+    <button id="nbBtn" title="Add the standard notes block (title, change log, notes)">Notes block</button>
+    <button id="fxBtn" title="Rewrite OUTER/CROSS APPLY and STRING_AGG so EBS Central's validator accepts the query">Fix for EBS</button>
     <label class="inline"><input type="checkbox" id="showInfo" checked> Show tips</label>
     <label class="inline"><input type="checkbox" id="ebs" checked> EBS mode</label>
   </div>
@@ -85,6 +91,17 @@
   </details>
 </main>
 
+<dialog id="projDlg" style="border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);width:min(520px,94vw);padding:18px 20px">
+  <form method="dialog" id="projForm">
+    <h2 style="margin:0 0 10px;font-size:18px">Save to a project</h2>
+    <p class="meta" style="margin-top:0">Keeps this query in a project's SQL tab in the <a href="../project-planner/index.html">Project Planner</a>, where it's saved to the project folder or GitHub as a .sql file.</p>
+    <label style="display:block;font-size:12px;color:var(--muted);margin:8px 0 3px">Project</label><select id="pjSel" style="width:100%"></select>
+    <label style="display:block;font-size:12px;color:var(--muted);margin:8px 0 3px">Save as</label><select id="pjQ" style="width:100%"></select>
+    <label style="display:block;font-size:12px;color:var(--muted);margin:8px 0 3px">Query name</label><input id="pjName" style="width:100%;box-sizing:border-box" required>
+    <label style="display:block;font-size:12px;color:var(--muted);margin:8px 0 3px">What it does (optional)</label><input id="pjDesc" style="width:100%;box-sizing:border-box">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button type="button" id="pjCancel">Cancel</button><button type="submit" class="primary">Save</button></div>
+  </form>
+</dialog>
 <script src="validate.js"></script>
 <script>
 (function () {
@@ -580,6 +597,59 @@
   $("clearBtn").addEventListener("click", function () { $("sql").value = ""; render(); $("sql").focus(); });
   var hand = window.BITK && BITK.take();
   if (hand && hand.tool === "sql" && hand.files && hand.files[0]) { $("sql").value = hand.files[0].text; render(); }
+
+  // ---------- save to the Project Planner ----------
+  var PSTORE = "bitk.projects.v1", origin = hand && hand.from && hand.from.project ? hand.from : null;
+  function readP() { try { var s = JSON.parse(localStorage.getItem(PSTORE) || "null"); return s && s.projects ? s : null; } catch (e) { return null; } }
+  function pslug(x) { return String(x || "query").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "query"; }
+  function saveQuery(pid, qid, name, desc) {
+    var ps = readP(), p = ps && ps.projects[pid]; if (!p) return null;
+    p.queries = p.queries || [];
+    var now = new Date().toISOString(), q = qid && p.queries.filter(function (x) { return x.id === qid; })[0], text = $("sql").value;
+    if (q) { q.hist = q.hist || []; if (q.sql && q.sql !== text) { q.hist.push({ at: q.updated || now, sql: q.sql }); if (q.hist.length > 30) q.hist.splice(0, q.hist.length - 30); } }
+    else { q = { id: "q" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), db: "", tags: "", desc: "", created: now, hist: [] }; q.file = pslug(name) + "-" + q.id.slice(-4); p.queries.push(q); }
+    q.sql = text; if (name) q.name = name; if (desc !== undefined && desc !== "") q.desc = desc; q.updated = now; p.updated = now;
+    try { localStorage.setItem(PSTORE, JSON.stringify(ps)); } catch (e) { alert("Couldn't save: browser storage is full."); return null; }
+    return { p: p, q: q };
+  }
+  function showBack() {
+    var b = $("backBtn"); if (!origin) { b.hidden = true; return; }
+    var ps = readP(), p = ps && ps.projects[origin.project], q = p && (p.queries || []).filter(function (x) { return x.id === origin.query; })[0];
+    if (!q) { b.hidden = true; return; }
+    b.hidden = false; b.textContent = "Save back to " + p.name; b.title = "Update \"" + q.name + "\" in that project";
+  }
+  $("backBtn").addEventListener("click", function () {
+    if (!$("sql").value.trim()) return;
+    var r = saveQuery(origin.project, origin.query); var b = this;
+    if (r) { var t = b.textContent; b.textContent = "Saved ✓"; setTimeout(function () { b.textContent = t; }, 1500); }
+  });
+  $("projBtn").addEventListener("click", function () {
+    if (!$("sql").value.trim()) { alert("Paste a query first."); return; }
+    var ps = readP();
+    if (!ps || !Object.keys(ps.projects).length) { alert("No projects yet. Create one in the Project Planner first."); return; }
+    var sel = $("pjSel"), list = Object.keys(ps.projects).map(function (k) { return ps.projects[k]; }).sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); });
+    sel.innerHTML = list.map(function (p) { return '<option value="' + p.id + '">' + p.name.replace(/[&<>"]/g, "") + "</option>"; }).join("");
+    if (origin && ps.projects[origin.project]) sel.value = origin.project; else if (ps.cur && ps.projects[ps.cur]) sel.value = ps.cur;
+    function fillQ() {
+      var p = ps.projects[sel.value], qs = (p.queries || []);
+      $("pjQ").innerHTML = '<option value="">A new query</option>' + qs.map(function (q) { return '<option value="' + q.id + '">Replace: ' + q.name.replace(/[&<>"]/g, "") + "</option>"; }).join("");
+      if (origin && origin.project === sel.value && qs.some(function (q) { return q.id === origin.query; })) $("pjQ").value = origin.query;
+      var cur = qs.filter(function (q) { return q.id === $("pjQ").value; })[0];
+      $("pjName").value = cur ? cur.name : (origin && origin.name) || ""; $("pjDesc").value = cur ? cur.desc || "" : "";
+    }
+    sel.onchange = fillQ; $("pjQ").onchange = function () { var p = ps.projects[sel.value], cur = (p.queries || []).filter(function (q) { return q.id === $("pjQ").value; })[0]; if (cur) { $("pjName").value = cur.name; $("pjDesc").value = cur.desc || ""; } };
+    fillQ(); $("projDlg").showModal(); $("pjName").focus();
+  });
+  $("pjCancel").addEventListener("click", function () { $("projDlg").close(); });
+  $("projForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var r = saveQuery($("pjSel").value, $("pjQ").value, $("pjName").value.trim() || "Untitled query", $("pjDesc").value.trim());
+    $("projDlg").close();
+    if (r) { origin = { project: r.p.id, query: r.q.id, name: r.q.name }; showBack(); var b = $("projBtn"); b.textContent = "Saved to " + r.p.name + " ✓"; setTimeout(function () { b.textContent = "Save to project…"; }, 2000); }
+  });
+  showBack();
+  $("fxBtn").addEventListener("click", function () { var q = $("sql").value; if (q.trim() && window.BITK && BITK.give({ tool: "ebsfix", files: [{ name: "query.sql", text: q }], from: origin || undefined })) window.open("../ebs-fixer/index.html", "_blank"); });
+  $("nbBtn").addEventListener("click", function () { var q = $("sql").value; if (q.trim() && window.BITK && BITK.give({ tool: "notes", files: [{ name: "query.sql", text: q }], from: origin || undefined })) window.open("../sql-notes/index.html", "_blank"); });
   $("sql").addEventListener("keydown", function (e) {
     if (e.key === "Tab") { e.preventDefault(); var ta = this, a = ta.selectionStart; ta.setRangeText("    ", a, ta.selectionEnd, "end"); soon(); }
   });

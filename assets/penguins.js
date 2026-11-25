@@ -1,4 +1,6 @@
-// ASCII penguin used as the home page background (tiled, faint, whole page).
+// Home page background: whole ASCII penguins falling down the page like digital rain,
+// with a few characters flickering. Each penguin keeps its shape so you can see it.
+// Drawn on a canvas behind the page; text always sits on solid panels on top.
 window.PENGUIN_ART = [
 "dHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHb",
 "HHP%%#%%%%%%%%%%%%%%%%#%%%%%%%#%%VHH",
@@ -24,26 +26,79 @@ window.PENGUIN_ART = [
 "VHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHV"
 ];
 (function () {
-  function build() {
-    var el = document.body; if (!document.querySelector(".home-hero")) return;
-    var art = window.PENGUIN_ART, fs = 9, lh = 9.5, cw = fs * 0.6;
-    var w = Math.ceil(art[0].length * cw) + 34, h = Math.ceil(art.length * lh) + 30;
-    function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-    function block(x, y) {
-      return '<text x="' + x + '" y="' + y + '" xml:space="preserve">' + art.map(function (l, i) {
-        return '<tspan x="' + x + '" dy="' + (i ? lh : 0) + '">' + esc(l) + '</tspan>';
-      }).join("") + "</text>";
-    }
-    var dark = document.documentElement.getAttribute("data-theme") === "dark" ||
-      (!document.documentElement.getAttribute("data-theme") && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
-    var colour = dark ? "#9e89ff" : "#765de5", op = dark ? 0.16 : 0.13;
-    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + (w * 2) + '" height="' + (h * 2) + '">' +
-      '<g font-family="Consolas, \'Courier New\', monospace" font-size="' + fs + '" fill="' + colour + '" fill-opacity="' + op + '">' +
-      block(10, 18) + block(10 + w, 18 + h) + "</g></svg>";
-    el.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
+  if (!document.querySelector(".home-hero")) return;
+  var art = window.PENGUIN_ART, W = art[0].length, H = art.length;
+
+  var cv = document.createElement("canvas");
+  cv.className = "rain"; cv.setAttribute("aria-hidden", "true");
+  document.body.insertBefore(cv, document.body.firstChild);
+  var ctx = cv.getContext("2d"), FS = 11, LH = 12, CW = 0, AW = 0, AH = H * LH, lanes = [], vh = 0, dpr = 1, raf = 0, last = 0, col = "#765de5", base = 0.3;
+  var still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var GLYPH = "H%#dbVA:~'`ao";
+  // How strongly each character shows: the solid H outline and body stand out, the % fill sits back
+  function weight(ch) { return /[HdbVA]/.test(ch) ? 1 : /[%#]/.test(ch) ? 0.38 : 0.75; }
+
+  function theme() {
+    var t = document.documentElement.getAttribute("data-theme");
+    var dark = t === "dark" || (!t && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+    col = dark ? "#9e89ff" : "#765de5"; base = dark ? 0.34 : 0.28;
   }
-  build();
-  // Re-colour when the theme changes
-  new MutationObserver(build).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  if (window.matchMedia) { var m = matchMedia("(prefers-color-scheme: dark)"); if (m.addEventListener) m.addEventListener("change", build); }
+  var SCALES = [0.6, 0.75, 0.9, 1, 1.15], vw = 0;
+  // a penguin anywhere across the page; smaller ones are fainter and slower, so it has some depth
+  function lane(x, first) {
+    var sc = SCALES[Math.floor(Math.random() * SCALES.length)], h = AH * sc;
+    return { sc: sc, x: Math.random() * (vw - AW * sc * 0.5) - AW * sc * 0.25, y: first ? Math.random() * (vh + h) - h : -h - Math.random() * vh * 0.6,
+      v: (1.6 + Math.random() * 2.4) * sc, glitch: {} };
+  }
+  function size() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = window.innerWidth; vh = window.innerHeight; vw = w;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(vh * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = FS + "px Consolas, 'Cascadia Mono', 'Courier New', monospace"; ctx.textBaseline = "top";
+    CW = ctx.measureText("H").width; AW = Math.ceil(CW * W);
+    var n = Math.max(3, Math.round(w * vh / (AW * AH) * 0.9));   // roughly one screen's worth, overlapping freely
+    lanes = [];
+    for (var i = 0; i < n; i++) lanes.push(lane(0, true));
+    lanes.sort(function (a, b) { return a.sc - b.sc; });       // big ones drawn on top
+  }
+  function draw() {
+    ctx.clearRect(0, 0, cv.width, cv.height); ctx.fillStyle = col;
+    for (var i = 0; i < lanes.length; i++) {
+      var p = lanes[i], cw = CW * p.sc, lh = LH * p.sc, depth = 0.55 + 0.45 * (p.sc - 0.6) / 0.55;
+      ctx.font = (FS * p.sc).toFixed(1) + "px Consolas, 'Cascadia Mono', 'Courier New', monospace";
+      for (var r = 0; r < H; r++) {
+        var y = p.y + r * lh; if (y < -lh || y > vh) continue;
+        var fade = 0.25 + 0.75 * (r / (H - 1));            // top of the penguin trails off, leading edge brightest
+        for (var c = 0; c < W; c++) {
+          var ch = p.glitch[r * W + c] || art[r][c]; if (ch === " ") continue;
+          ctx.globalAlpha = Math.min(1, base * depth * fade * weight(art[r][c]) * (r === H - 1 ? 1.6 : 1));
+          ctx.fillText(ch, p.x + c * cw, y);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function step(t) {
+    raf = requestAnimationFrame(step);
+    if (t - last < 33) return;                       // ~30 fps is plenty
+    var dt = Math.min((t - last) / 33, 3); last = t;
+    for (var i = 0; i < lanes.length; i++) {
+      var p = lanes[i]; p.y += p.v * dt;
+      // a few characters flicker, like falling code, without losing the shape
+      if (Math.random() < 0.5) { var k = Math.floor(Math.random() * W * H); if (art[Math.floor(k / W)][k % W] !== " ") p.glitch[k] = GLYPH[Math.floor(Math.random() * GLYPH.length)]; }
+      if (Math.random() < 0.5) { var keys = Object.keys(p.glitch); if (keys.length) delete p.glitch[keys[Math.floor(Math.random() * keys.length)]]; }
+      if (p.y > vh) { lanes[i] = lane(0, false); lanes[i].sc = p.sc; lanes[i].v = (1.6 + Math.random() * 2.4) * p.sc; }
+    }
+    draw();
+  }
+  function start() { if (!still && !raf && !document.hidden) { last = performance.now(); raf = requestAnimationFrame(step); } }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+
+  theme(); size(); draw(); start();
+  var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { size(); draw(); }, 150); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) stop(); else start(); });
+  new MutationObserver(function () { theme(); draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (window.matchMedia) { var m = matchMedia("(prefers-color-scheme: dark)"); if (m.addEventListener) m.addEventListener("change", function () { theme(); draw(); }); }
+  window.__rain = { stop: stop, start: start };
 })();

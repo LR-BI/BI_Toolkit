@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ontrack Page Builder · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  main.wide { max-width: none; }
+  .ob { display: grid; grid-template-columns: minmax(380px, 560px) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .ob input[type=text], .ob input[type=number], .ob select, .ob textarea { box-sizing: border-box; }
+  .ob textarea { font-family: var(--mono); font-size: 12.5px; }
+  .sect { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; background: var(--panel); }
+  .sect > h3 { margin: 0 0 8px; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+  .sect > h3 .sp { flex: 1; }
+  .sect > h3 { flex-wrap: wrap; } .sect > h3 select, .sect > h3 button { min-height: 0; padding: 4px 8px; font-size: 13px; font-weight: 400; } #pick { max-width: 210px; }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .g2 label, .rule label.l { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+  .g2 input, .g2 select { width: 100%; }
+  .bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .bar button, .bar select, .rule button, .rule select, .rule input { min-height: 0; padding: 4px 8px; font-size: 13px; }
+  .rule { border: 1px solid var(--border); border-left: 4px solid var(--accent-2); border-radius: 7px; padding: 8px 10px; margin: 8px 0; background: var(--bg); }
+  .rule.off { border-left-color: var(--muted); border-style: dashed; }
+  .rule.off .hd b::after { content: " (off)"; color: var(--muted); font-weight: 400; }
+  .rule .hd { display: flex; gap: 6px; align-items: center; }
+  .rule .hd b { flex: 1; font-size: 13.5px; }
+  .rule .sum { font-size: 12.5px; color: var(--muted); margin: 3px 0 6px; }
+  .rule .body { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .rule .body .wide { grid-column: 1 / -1; }
+  .rule .body input[type=text], .rule .body select, .rule .body textarea { width: 100%; }
+  .rule .body textarea { min-height: 54px; }
+  .rule .ck { flex-direction: row !important; align-items: center; gap: 6px !important; color: var(--text) !important; font-size: 13px !important; }
+  .conds { grid-column: 1 / -1; border-top: 1px dashed var(--border); padding-top: 6px; font-size: 13px; }
+  .conds .c { display: grid; grid-template-columns: 1.2fr 1.1fr 1fr auto; gap: 5px; margin: 4px 0; }
+  .conds .c input, .conds .c select { width: 100%; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 8px; flex-wrap: wrap; }
+  .tabs button { border: 0; border-bottom: 2px solid transparent; background: none; border-radius: 0; padding: 7px 12px; min-height: 0; font-size: 14px; color: var(--muted); }
+  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  #out { width: 100%; box-sizing: border-box; height: calc(100vh - 240px); min-height: 480px; font-family: var(--mono); font-size: 12px; line-height: 1.45; white-space: pre; background: var(--panel); }
+  .right { position: sticky; top: 64px; }
+  #notes { margin: 8px 0 0; padding-left: 18px; font-size: 13px; } #notes li { margin: 2px 0; } #notes .bad { color: var(--danger); }
+  .addrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .addrow button { min-height: 0; padding: 6px 8px; font-size: 13px; text-align: left; }
+  .addrow button small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 400; }
+  @media (max-width: 1050px) { .ob { grid-template-columns: minmax(0, 1fr); } .right { position: static; } #out { height: 420px; } }
+</style>
+</head>
+<body>
+<main class="wide">
+  <h1>Ontrack Page Builder</h1>
+  <p class="lead">Pick what a Screen Designer page should do: defaults, show/hide, required fields, locks, format checks, grid colours, banners, buttons and after-save steps. It writes one <code>&lt;script&gt;</code> for a CustomHTML control, plus a test plan. No jQuery needed, and it re-runs itself after every ajax refresh.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li>On the live screen press <strong>F12</strong>, open <strong>Console</strong>, and paste the <strong>Field lister</strong> (tab on the right). It prints every field with its DataLink and copies the names. Paste them into <strong>Fields on this screen</strong>.</li>
+      <li>Set the <strong>DataLink</strong> most fields use. For a field from another DataLink, write <code>DataLink.FIELD</code> (e.g. <code>PersonDetails.DATE_OF_BIRTH</code>).</li>
+      <li>Add rules. Each can have conditions (<em>when MODE is FT and DATE_OF_BIRTH age at 31 Aug is 16-18</em>). Ages use 31 August of the current academic year, as the ILR does.</li>
+      <li>Formulas use <code>{FIELD}</code> for a field's value, plus <code>age()</code>, <code>today()</code>, <code>date()</code>, <code>num()</code>: e.g. <code>num({HOURS_PER_WEEK}) * 36</code>.</li>
+      <li>Copy the <strong>Script</strong> into one CustomHTML control on the page (anywhere; banners and buttons placed "at the script" appear where that control is).</li>
+      <li>Work through the <strong>Test plan</strong> on the test system, with <strong>Debug</strong> ticked so F12 shows what each rule did. Untick it for live.</li>
+    </ol>
+    <p>Required fields and format checks stop the Save button (any button whose text has the "Save words") and show what's wrong. That's a convenience, not security: back it up with a table constraint or workflow check if it really matters.</p>
+  </details>
+
+  <div class="ob">
+    <div>
+      <div class="sect">
+        <h3><span class="sp">Page</span>
+          <select id="pick" title="Saved pages in this browser"></select>
+          <button id="newP" title="New page">New</button><button id="dupP" title="Copy this page">Copy</button><button id="delP" title="Delete this page">Delete</button></h3>
+        <div class="g2">
+          <label>Page name<input type="text" id="c_name"></label>
+          <label>Main DataLink<input type="text" id="c_dl" placeholder="e.g. PersonDetails"></label>
+          <label>Row (Data[n])<input type="number" id="c_row" min="0"></label>
+          <label>Date format the screen uses<select id="c_datefmt"><option value="dmy">dd/mm/yyyy</option><option value="iso">yyyy-mm-dd</option><option value="mon">dd-Mon-yyyy</option></select></label>
+          <label>Save words (button text)<input type="text" id="c_saveWords" placeholder="save"></label>
+          <label>…or Save button selector<input type="text" id="c_saveSel" placeholder="optional, e.g. #btnSave"></label>
+          <label>Field row selector<input type="text" id="c_box" placeholder="optional, e.g. .form-group"></label>
+          <label>Button CSS class<input type="text" id="c_btnClass" placeholder="e.g. btn btn-primary"></label>
+        </div>
+        <label class="inline" style="margin-top:6px"><input type="checkbox" id="c_debug"> Debug: log what each rule does to F12 Console</label>
+        <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);margin-top:6px">Fields on this screen (paste from the Field lister; one per line)
+          <textarea id="c_fields" rows="4" spellcheck="false" placeholder="DATE_OF_BIRTH&#10;MODE_OF_ATTENDANCE&#10;EMPLOYMENT_STATUS"></textarea></label>
+      </div>
+
+      <div class="sect">
+        <h3><span class="sp">Rules</span><button id="ex">Load example</button></h3>
+        <div id="rules"></div>
+        <div class="hint" style="margin:8px 0 6px">Add a rule:</div>
+        <div class="addrow" id="add"></div>
+      </div>
+      <div class="bar"><button id="expJ">Export page (.json)</button><button id="impJ">Import .json</button><input type="file" id="impF" accept=".json,application/json" hidden></div>
+    </div>
+
+    <div class="right">
+      <div class="tabs" id="tabs"><button data-t="script" class="on">Script</button><button data-t="lister">F12 field lister</button><button data-t="ajax">F12 save watcher</button><button data-t="plan">Test plan</button><button data-t="gotchas">Checklist</button></div>
+      <div class="bar" style="margin-bottom:8px"><button id="copy" class="primary">Copy</button><button id="dl">Download</button><label class="inline" id="cmpW"><input type="checkbox" id="compact"> Compact</label><span class="hint" id="size"></span></div>
+      <textarea id="out" readonly spellcheck="false"></textarea>
+      <ul id="notes"></ul>
+    </div>
+  </div>
+  <datalist id="fl"></datalist>
+</main>
+<script src="runtime.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var STORE = "bitk.ontrackpb.v1", tab = "script", st, page;
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function uid() { return Math.random().toString(36).slice(2, 8); }
+  function pad(n) { return ("0" + n).slice(-2); }
+  function today() { var d = new Date(); return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + String(d.getFullYear()).slice(2); }
+
+  // ---------- rule types ----------
+  var OPS = [["is", "is"], ["not", "is not"], ["blank", "is blank"], ["filled", "is filled in"], ["in", "is one of (a,b,c)"], ["notin", "is not one of"], ["has", "contains"],
+    ["gt", "is more than / after"], ["lt", "is less than / before"], ["age", "age at 31 Aug is (16-18, 19+)"], ["future", "date is in the future"], ["past", "date is in the past"]];
+  var NOVAL = { blank: 1, filled: 1, future: 1, past: 1 };
+  var TONES = [["info", "Purple (info)"], ["good", "Green (good)"], ["warn", "Amber (warning)"], ["bad", "Red (problem)"]];
+  var PLACES = [["top", "Where the script is"], ["field", "Under a field"]];
+  var TYPES = {
+    "default": { name: "Default value", tip: "fill a blank field", cond: true, f: [
+      ["field", "Field", "field"], ["how", "Value is", "sel", [["text", "this text / code"], ["today", "today's date"], ["copy", "copied from field"], ["formula", "a formula"]]],
+      ["value", "Value / field / formula", "text", null, "wide"], ["onlyNew", "Only if nothing saved yet (skip existing records)", "ck"]],
+      init: { how: "text", onlyNew: true } },
+    computed: { name: "Calculated field", tip: "keep a field = formula", cond: true, f: [
+      ["field", "Field to fill", "field"], ["onlyBlank", "Only when blank", "ck"], ["formula", "Formula, e.g. num({A}) * 2  or  age({DATE_OF_BIRTH})", "code", null, "wide"]] },
+    showhide: { name: "Show / hide", tip: "fields depend on others", cond: true, f: [
+      ["mode", "Fields are", "sel", [["show", "shown only when…"], ["hide", "hidden when…"]]], ["clear", "Clear the value when hidden", "ck"], ["fields", "Fields (comma or new line)", "fields", null, "wide"]],
+      init: { mode: "show" } },
+    required: { name: "Required", tip: "block Save if blank", cond: true, f: [
+      ["fields", "Fields", "fields", null, "wide"], ["msg", "Message (optional, {FIELD} allowed)", "text", null, "wide"]] },
+    lock: { name: "Read-only", tip: "lock fields when…", cond: true, f: [["fields", "Fields to lock", "fields", null, "wide"]] },
+    validate: { name: "Format check", tip: "ULN, NI, postcode…", cond: true, f: [
+      ["field", "Field", "field"], ["check", "Must be", "sel", [["uln", "a valid ULN (check digit)"], ["ni", "an NI number"], ["postcode", "a UK postcode"], ["email", "an email address"], ["phone", "a UK phone number"], ["date", "a date"], ["notfuture", "a date, not in the future"], ["range", "a number in range (arg: 1-99)"], ["maxlen", "no longer than (arg: 50)"], ["regex", "matching a regex (arg)"]]],
+      ["arg", "Arg (range / length / regex)", "text"], ["msg", "Message", "text"]], init: { check: "uln" } },
+    grid: { name: "Grid colours", tip: "colour cells or rows", cond: false, f: [
+      ["grid", "Grid selector (from F12)", "text"], ["col", "Column heading", "text"], ["op", "When the cell", "sel", OPS], ["v", "Value", "text"],
+      ["tone", "Colour", "sel", [["green", "Green"], ["amber", "Amber"], ["red", "Red"], ["purple", "Purple"], ["bold", "Bold text"]]], ["row", "Colour the whole row", "ck"]],
+      init: { op: "is", tone: "amber", row: true } },
+    banner: { name: "Banner", tip: "message on the page", cond: true, f: [
+      ["text", "Text ({FIELD} shows a value)", "text", null, "wide"], ["tone", "Colour", "sel", TONES], ["place", "Place", "sel", PLACES], ["at", "Field (if under a field)", "field"]],
+      init: { tone: "info", place: "top" } },
+    button: { name: "Button", tip: "set a value, open a link…", cond: true, f: [
+      ["label", "Button text", "text"], ["action", "Does", "sel", [["set", "set a field (field, value)"], ["click", "click another button (selector)"], ["url", "open a link ({FIELD} allowed)"], ["js", "run code"]]],
+      ["a1", "Field / selector / link", "text"], ["a2", "Value (set) or 'same' tab (link)", "text"], ["code", "Code (run code): get('X'), set('X', 1), toast('hi')", "code", null, "wide"],
+      ["place", "Place", "sel", PLACES], ["at", "Field (if under a field)", "field"]], init: { action: "set", place: "top" } },
+    aftersave: { name: "After save", tip: "chain a step after ajax", cond: false, f: [
+      ["url", "Ajax URL contains (F12 save watcher)", "text"], ["postOnly", "POST requests only", "ck"],
+      ["action", "Then", "sel", [["message", "show a message"], ["click", "click a button (selector)"], ["reload", "reload the page"], ["goto", "go to a link"]]], ["arg", "Message / selector / link", "text"],
+      ["later", "Do it after the page reloads (sessionStorage)", "ck"]], init: { postOnly: true, action: "message" } }
+  };
+
+  // ---------- storage ----------
+  function blank(n) { return { id: uid(), cfg: { name: n || "New page", dl: "", row: 0, datefmt: "dmy", saveWords: "save", saveSel: "", box: "", btnClass: "", debug: true, fields: "" }, rules: [], updated: Date.now() }; }
+  function load() { try { st = JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { st = null; } if (!st || !st.pages || !Object.keys(st.pages).length) { var p = blank("My first page"); st = { cur: p.id, pages: {} }; st.pages[p.id] = p; } if (!st.pages[st.cur]) st.cur = Object.keys(st.pages)[0]; page = st.pages[st.cur]; }
+  function save() { page.updated = Date.now(); try { localStorage.setItem(STORE, JSON.stringify(st)); } catch (e) {} }
+  window.addEventListener("storage", function (e) { if (e.key === STORE) { load(); drawAll(); } });
+
+  // ---------- describing rules (comments, summaries, test plan) ----------
+  function opText(op) { for (var i = 0; i < OPS.length; i++) if (OPS[i][0] === op) return OPS[i][1].replace(/ \(.*\)$/, ""); return op; }
+  function condText(r) {
+    if (!r.when || !r.when.length) return "";
+    return " when " + r.when.map(function (c) { return (c.op === "age" ? "age of " + c.f + " at 31 Aug is " + c.v : c.f + " " + opText(c.op) + (NOVAL[c.op] ? "" : " " + (c.v === "" ? "(blank)" : "'" + c.v + "'"))); }).join(r.any ? " or " : " and ");
+  }
+  function list(s) { return String(s || "").split(/[\s,]+/).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function btnText(r) { return r.action === "set" ? "sets " + r.a1 + " to '" + (r.a2 || "") + "'" : r.action === "click" ? "clicks " + r.a1 : r.action === "url" ? "opens " + r.a1 : "runs its code"; }
+  function afterText(r) { return r.action === "message" ? "shows '" + r.arg + "'" : r.action === "click" ? "clicks " + r.arg : r.action === "reload" ? "reloads the page" : "goes to " + r.arg; }
+  function describe(r) {
+    var t = TYPES[r.t], c = condText(r);
+    switch (r.t) {
+      case "default": return "Default " + (r.field || "?") + " to " + (r.how === "today" ? "today's date" : r.how === "copy" ? "the value of " + r.value : r.how === "formula" ? "= " + r.value : "'" + (r.value || "") + "'") + " if blank" + (r.onlyNew ? " (new records only)" : "") + c;
+      case "computed": return "Keep " + (r.field || "?") + " = " + (r.formula || "?") + (r.onlyBlank ? " (only when blank)" : "") + c;
+      case "showhide": return (r.mode === "show" ? "Show " : "Hide ") + (list(r.fields).join(", ") || "?") + (r.mode === "show" ? " only" : "") + (c || " (no condition set)") + (r.clear ? "; clear when hidden" : "");
+      case "required": return (list(r.fields).join(", ") || "?") + " required" + (c || " always");
+      case "lock": return "Lock " + (list(r.fields).join(", ") || "?") + (c || " always");
+      case "validate": return (r.field || "?") + " must be " + (t.f[1][3].filter(function (o) { return o[0] === r.check; })[0] || ["", "?"])[1].replace(/ \(arg.*\)/, "") + (r.arg ? " (" + r.arg + ")" : "") + c;
+      case "grid": return "In " + (r.grid || "?") + ", colour " + (r.row ? "the row" : "the cell") + " " + (r.tone || "") + " when " + (r.col || "?") + " " + opText(r.op) + (NOVAL[r.op] ? "" : " '" + (r.v || "") + "'");
+      case "banner": return "Banner: \"" + (r.text || "") + "\"" + c;
+      case "button": return "Button \"" + (r.label || "?") + "\": " + btnText(r) + c;
+      case "aftersave": return "After a successful ajax call to …" + (r.url || "?") + "…: " + afterText(r) + (r.later ? " (after the reload)" : "");
+    }
+    return t ? t.name : r.t;
+  }
+
+  // ---------- problems in the setup ----------
+  function knownFields() { return list(page.cfg.fields).map(function (x) { return x.toUpperCase(); }); }
+  function issues() {
+    var out = [], known = knownFields(), seen = {};
+    function chkF(f, i) { if (!f) return; var bare = f.split(".").pop().toUpperCase(); if (known.length && known.indexOf(f.toUpperCase()) < 0 && known.indexOf(bare) < 0 && !seen[f]) { seen[f] = 1; out.push(["warn", "Rule " + (i + 1) + ": " + f + " isn't in the fields list. Check the spelling (names are matched exactly)."]); } }
+    if (!page.cfg.dl) out.push(["warn", "No main DataLink: fields will match any DataLink. Fine if names are unique on the screen."]);
+    page.rules.forEach(function (r, i) {
+      if (r.off) return;
+      (r.when || []).forEach(function (c) { chkF(c.f, i); if (!c.f) out.push(["bad", "Rule " + (i + 1) + ": a condition has no field."]); });
+      ["field", "at"].forEach(function (k) { if (r[k]) chkF(r[k], i); });
+      if (r.t === "button" && r.action === "set") chkF(r.a1, i);
+      list(r.fields).forEach(function (f) { chkF(f, i); });
+      if ((r.t === "default" || r.t === "computed" || r.t === "validate") && !r.field) out.push(["bad", "Rule " + (i + 1) + ": pick a field."]);
+      if ((r.t === "showhide" || r.t === "required" || r.t === "lock") && !list(r.fields).length) out.push(["bad", "Rule " + (i + 1) + ": add at least one field."]);
+      if (r.t === "showhide" && !(r.when || []).length) out.push(["bad", "Rule " + (i + 1) + ": show/hide needs a condition."]);
+      if (r.t === "validate" && !r.msg) out.push(["warn", "Rule " + (i + 1) + ": add a message so staff know what's wrong."]);
+      if (r.t === "validate" && /^(range|maxlen|regex)$/.test(r.check) && !r.arg) out.push(["bad", "Rule " + (i + 1) + ": this check needs an Arg."]);
+      if (r.t === "validate" && r.check === "regex" && r.arg) { try { new RegExp(r.arg); } catch (e) { out.push(["bad", "Rule " + (i + 1) + ": the regex doesn't compile."]); } }
+      if ((r.t === "computed" || (r.t === "default" && r.how === "formula") || (r.t === "button" && r.action === "js"))) { var src = r.t === "button" ? r.code : r.t === "computed" ? r.formula : r.value; try { new Function("H", body(r, src)); } catch (e) { out.push(["bad", "Rule " + (i + 1) + ": the formula/code has a syntax error (" + e.message + ")."]); } }
+      if (r.t === "grid" && (!r.grid || !r.col)) out.push(["bad", "Rule " + (i + 1) + ": grid needs a selector and a column heading."]);
+      if (r.t === "aftersave" && !r.url) out.push(["bad", "Rule " + (i + 1) + ": add part of the save URL (use the F12 save watcher)."]);
+      if (r.t === "lock") out.push(["info", "Rule " + (i + 1) + ": locking is on the page only; the field is still saved. Use Screen Designer's read-only setting if it must never change."]);
+      if (r.t === "default" && r.onlyNew === false) out.push(["info", "Rule " + (i + 1) + ": defaults existing records too; it will fill old blanks the first time someone opens them."]);
+    });
+    return out;
+  }
+
+  // ---------- code generation ----------
+  var HELP = ["v", "get", "set", "age", "today", "date", "num", "fmt", "toast", "apply"];
+  function expr(src) {
+    return String(src || "").replace(/\{([\w.]+)\}/g, function (m, f) { return "H.v(" + JSON.stringify(f) + ")"; })
+      .replace(new RegExp("(^|[^.\\w$])(" + HELP.join("|") + ")\\s*\\(", "g"), function (m, a, b) { return a + "H." + b + "("; });
+  }
+  function body(r, src) { return r.t === "button" ? expr(src) : "return (" + (expr(src) || "''") + ");"; }
+  function ruleData(r) {
+    var o = { t: r.t }, T = TYPES[r.t];
+    T.f.forEach(function (f) { var k = f[0], val = r[k]; if (k === "code" || k === "formula") return; if (f[2] === "fields") val = list(val); if (val === undefined || val === "" || val === false) return; o[k] = val; });
+    if (r.t === "default" && (r.how === "formula" || r.how === "copy" || r.how === "today")) delete o.value;
+    if (T.cond && r.when && r.when.length) { o.when = r.when.filter(function (c) { return c.f; }).map(function (c) { var x = { f: c.f, op: c.op }; if (!NOVAL[c.op]) x.v = c.v || ""; return x; }); if (r.any) o.any = true; }
+    if (r.off) o.off = true;
+    return o;
+  }
+  function fnFor(r) {
+    if (r.t === "computed") return r.formula;
+    if (r.t === "default" && r.how === "formula") return r.value;
+    if (r.t === "default" && r.how === "copy") return "{" + (r.value || "") + "}";
+    if (r.t === "default" && r.how === "today") return "today()";
+    if (r.t === "button" && r.action === "js") return r.code;
+    return null;
+  }
+  function slug(s) { return String(s || "page").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || "page"; }
+  function cfgOut() {
+    var c = page.cfg, o = { id: slug(c.name), name: c.name || "Ontrack page", dl: c.dl.trim(), row: +c.row || 0, datefmt: c.datefmt || "dmy" };
+    if (c.saveSel) o.saveSel = c.saveSel; else o.saveWords = c.saveWords || "save";
+    if (c.box) o.box = c.box; if (c.btnClass) o.btnClass = c.btnClass; o.debug = !!c.debug;
+    return o;
+  }
+  function js(o) { return JSON.stringify(o).replace(/<\//g, "<\\/").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029"); }
+  function compactSrc(s) {
+    return s.split("\n").map(function (l) { return l.replace(/^\s+/, ""); }).filter(function (l) { return l && !/^\/\//.test(l) && !/^\/\*.*\*\/$/.test(l); }).join("\n");
+  }
+  function script() {
+    var c = cfgOut(), rs = page.rules, L = [];
+    var rt = OTB_RUNTIME.toString().replace(/^function \(CFG, RULES\) \{/, "function (CFG, RULES) {");
+    if ($("compact").checked) rt = compactSrc(rt);
+    L.push("<script>");
+    L.push("/* ==== " + c.name + " · Ontrack Page Builder (BI Toolkit) · built " + today() + " ====");
+    rs.forEach(function (r, i) { L.push("   " + (i + 1) + ". " + (r.off ? "[off] " : "") + describe(r).replace(/\*\//g, "* /")); });
+    if (!rs.length) L.push("   (no rules yet)");
+    L.push("   F12 > Console: window.bitk_" + c.id + ".get('FIELD'), .problems(), .apply()");
+    L.push("   Edit by re-importing the page settings into the builder, not by hand. */");
+    L.push("(function () {");
+    L.push("var CFG = " + js(c) + ";");
+    L.push("var RULES = [");
+    rs.forEach(function (r, i) {
+      var d = js(ruleData(r)), src = fnFor(r);
+      if (src != null && String(src).trim()) d = d.slice(0, -1) + ", \"fn\": function (H) { " + body(r, src).replace(/<\//g, "<\\/") + " }}";
+      L.push("  // " + (i + 1) + ". " + describe(r).replace(/\n/g, " "));
+      L.push("  " + d + (i < rs.length - 1 ? "," : ""));
+    });
+    L.push("];");
+    L.push("(" + rt + ")(CFG, RULES);");
+    L.push("})();");
+    L.push("<\/script>");
+    return L.join("\n");
+  }
+  var LISTER = [
+    "// BI Toolkit · Ontrack field lister: paste into F12 > Console on the screen",
+    "(function () {",
+    "  var rows = [], names = [];",
+    "  function chain(el) { var out = []; for (var x = el.parentElement, n = 0; x && n < 4; x = x.parentElement, n++) out.push(x.tagName.toLowerCase() + (x.id ? '#' + x.id : '') + (x.className && typeof x.className === 'string' ? '.' + x.className.trim().split(/\\s+/).join('.') : '')); return out.join(' < '); }",
+    "  document.querySelectorAll('[name$=\".Value\"]').forEach(function (i) {",
+    "    var m = /DataLinks\\[([^\\]]+)\\]\\.Data\\[(\\d+)\\]\\.Items\\[([^\\]]+)\\]\\.Value$/.exec(i.name);",
+    "    if (!m || (i.type === 'hidden' && document.querySelector('[name=\"' + i.name + '\"]:not([type=\"hidden\"])'))) return;",
+    "    rows.push({ DataLink: m[1], Row: +m[2], Field: m[3], Kind: i.type === 'hidden' ? 'hidden' : (i.tagName.toLowerCase() + (i.type ? ':' + i.type : '')), Value: i.type === 'checkbox' ? i.checked : i.value, Inside: chain(i) });",
+    "    if (names.indexOf(m[3]) < 0) names.push(m[3]);",
+    "  });",
+    "  document.querySelectorAll('[id$=\"_DISP\"]').forEach(function (s) {",
+    "    var m = /_Items_(.+?)__Value_/.exec(s.id); if (!m) return;",
+    "    rows.push({ DataLink: '(read-only)', Row: '', Field: m[1], Kind: 'display', Value: s.textContent.trim(), Inside: chain(s) });",
+    "    if (names.indexOf(m[1]) < 0) names.push(m[1]);",
+    "  });",
+    "  document.querySelectorAll('table').forEach(function (t, n) {",
+    "    var h = [].map.call(t.querySelectorAll('th'), function (x) { return x.textContent.trim(); }).filter(Boolean);",
+    "    if (h.length) console.log('Grid ' + (n + 1) + ': ' + (t.id ? '#' + t.id : (t.closest('[id]') ? '#' + t.closest('[id]').id + ' table' : 'table')) + '  columns: ' + h.join(' | '));",
+    "  });",
+    "  console.table(rows);",
+    "  try { copy(names.join('\\n')); console.log(names.length + ' field names copied: paste them into the builder.'); } catch (e) { console.log(names.join('\\n')); }",
+    "})();"].join("\n");
+  var WATCH = [
+    "// BI Toolkit · save watcher: paste into F12 > Console, then click Save on the screen",
+    "(function () {",
+    "  if (window.__bitkWatch) return console.log('Already watching.'); window.__bitkWatch = 1;",
+    "  var X = XMLHttpRequest.prototype, open = X.open, send = X.send;",
+    "  X.open = function (m, u) { this.__m = m; this.__u = u; return open.apply(this, arguments); };",
+    "  X.send = function () { var x = this; x.addEventListener('loadend', function () {",
+    "    console.log('%c' + x.__m + ' ' + x.status + '  ' + x.__u, 'color:' + (x.status >= 400 ? '#c0392b' : '#522fb6') + ';font-weight:bold');",
+    "    if (x.status >= 500) console.log('  500 on save? Often a column missing from the parent grid query (add it as a hidden column).');",
+    "  }); return send.apply(this, arguments); };",
+    "  console.log('Watching ajax. Click Save: copy a distinctive part of the POST URL into the After save rule.');",
+    "})();"].join("\n");
+  function plan() {
+    var c = cfgOut(), L = ["Test plan: " + c.name + "  (" + today() + ")", "On the TEST system, with Debug ticked. Hard refresh (Ctrl+F5) after pasting the script.", ""];
+    L.push("[ ] 0. Page loads with no red errors in F12 > Console; it logs '[" + c.name + "] ready: " + page.rules.length + " rules'.");
+    page.rules.forEach(function (r, i) {
+      if (r.off) return;
+      var n = (i + 1) + ". ", cd = condText(r).replace(/^ when /, "");
+      switch (r.t) {
+        case "default":
+          L.push("[ ] " + n + "Open a NEW record" + (cd ? " where " + cd : "") + ": " + r.field + " fills in by itself. Save; reopen: value kept.");
+          if (cd) L.push("[ ]    Open one where that isn't true: " + r.field + " stays blank.");
+          L.push("[ ]    Clear " + r.field + " by hand: it stays cleared (no refill)." + (r.onlyNew ? " Open an OLD record with it blank: not touched." : "")); break;
+        case "computed": L.push("[ ] " + n + "Change the fields in the formula: " + r.field + " updates straight away. Try a blank and a non-number: no error, sensible result."); break;
+        case "showhide": L.push("[ ] " + n + "Make it true that " + (cd || "…") + ": " + list(r.fields).join(", ") + (r.mode === "show" ? " show" : " hide") + " (label too). Make it false: " + (r.mode === "show" ? "hidden again" : "shown again") + "." + (r.clear ? " Hidden values are cleared; Save and check the table." : "")); break;
+        case "required": L.push("[ ] " + n + (cd ? "Make it so " + cd + ", " : "") + "leave " + list(r.fields).join(", ") + " blank, click Save: NOT saved, the message lists them. Fill in: saves."); if (cd) L.push("[ ]    When that isn't true, Save works with them blank."); break;
+        case "lock": L.push("[ ] " + n + (cd ? "When " + cd + ": " : "") + list(r.fields).join(", ") + " can't be changed (greyed). " + (cd ? "Otherwise editable. " : "") + "Save still works."); break;
+        case "validate": L.push("[ ] " + n + "Type a wrong " + r.field + ": red outline and '" + (r.msg || "message") + "'; Save is blocked. A right one: message goes. Blank: allowed (add Required if not)."); break;
+        case "grid": L.push("[ ] " + n + "Grid " + (r.row ? "rows" : "cells") + " where " + r.col + " " + opText(r.op) + (NOVAL[r.op] ? "" : " '" + (r.v || "") + "'") + " are " + r.tone + ". Page or sort the grid, and refresh it: colours re-apply."); break;
+        case "banner": L.push("[ ] " + n + "Banner shows " + (cd ? "only when " + cd : "always") + (r.place === "field" ? ", under " + r.at : "") + ". Text values update when fields change."); break;
+        case "button": L.push("[ ] " + n + "Button '" + r.label + "' appears" + (cd ? " only when " + cd : "") + "; clicking it " + btnText(r) + "."); break;
+        case "aftersave": L.push("[ ] " + n + "Save: it " + afterText(r) + ". A failed save (e.g. a required field in EBS) does NOT trigger it."); break;
+      }
+    });
+    L.push("", "[ ] Last: untick Debug, rebuild, paste the final script, and test once more on TEST before live.");
+    return L.join("\n");
+  }
+  function gotchas() {
+    var has = function (t) { return page.rules.some(function (r) { return !r.off && r.t === t; }); };
+    var L = ["Before you put a Screen Designer page live", "",
+      "[ ] Fields are found by the END of their input name (…Items[FIELD].Value). EBS inputs have no id, and a read-only field is a …_DISP span, which the script reads but can't set.",
+      "[ ] A field set by script must be on the page as an editable input (not read-only) or it can't be filled or saved.",
+      "[ ] Ajax 500 when saving or expanding a grid? Usually a column the child query needs is missing from the parent grid: add it as a hidden column.",
+      "[ ] Writeback table with audit columns (CREATED_BY / CREATED_DATE …)? EBS may overwrite table defaults with blanks; set them in the query or a trigger instead.",
+      "[ ] The query behind the screen must pass the EBS Central validator: no OUTER/CROSS APPLY or STRING_AGG. Use the EBS Validator Fixer (tools/ebs-fixer).",
+      "[ ] One CustomHTML control per page for this script. Pasting it twice is safe (it only runs once), but two different builds would both run.",
+      "[ ] Hard refresh (Ctrl+F5) after changing the script; browsers cache screens. If IIS caches the screen definition, recycle the app pool.",
+      "[ ] Dropdowns drawn by a widget (Kendo etc.) may not show a value set by script until the widget refreshes. Test each one; if it doesn't show, set it with the widget's own API."];
+    if (has("lock")) L.push("[ ] Read-only by script is only on screen. For real protection use Screen Designer's read-only setting or a database permission.");
+    if (has("required") || has("validate")) L.push("[ ] Save is stopped by clicks on buttons whose text has '" + (page.cfg.saveSel || page.cfg.saveWords || "save") + "'. Check every save-like button on the page is caught (and nothing else is).");
+    if (has("aftersave")) L.push("[ ] After-save matches the ajax URL. Use the F12 save watcher, and pick a part of the URL only the save uses.");
+    if (page.rules.some(function (r) { return (r.when || []).some(function (c) { return c.op === "age"; }); })) L.push("[ ] Ages use 31 August of the current academic year (from 1 August it moves on a year). Test someone whose birthday is 1 September.");
+    return L.join("\n");
+  }
+
+  // ---------- rendering the editor ----------
+  function fieldOpts() { $("fl").innerHTML = knownFields().map(function (f) { return '<option value="' + esc(f) + '">'; }).join(""); }
+  function drawPick() { $("pick").innerHTML = Object.keys(st.pages).map(function (k) { return '<option value="' + k + '"' + (k === st.cur ? " selected" : "") + ">" + esc(st.pages[k].cfg.name) + "</option>"; }).join(""); }
+  function drawCfg() { ["name", "dl", "row", "datefmt", "saveWords", "saveSel", "box", "btnClass", "fields"].forEach(function (k) { $("c_" + k).value = page.cfg[k] == null ? "" : page.cfg[k]; }); $("c_debug").checked = !!page.cfg.debug; fieldOpts(); }
+  function control(r, f) {
+    var k = f[0], lab = f[1], kind = f[2], v = r[k] == null ? "" : r[k], cls = f[4] === "wide" || kind === "code" ? " wide" : "";
+    if (kind === "ck") return '<label class="l ck' + cls + '"><input type="checkbox" data-k="' + k + '"' + (v ? " checked" : "") + "> " + esc(lab) + "</label>";
+    if (kind === "sel") return '<label class="l' + cls + '">' + esc(lab) + '<select data-k="' + k + '">' + f[3].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === v ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select></label>";
+    if (kind === "code" || kind === "fields") return '<label class="l' + cls + '">' + esc(lab) + '<textarea data-k="' + k + '" spellcheck="false" rows="' + (kind === "fields" ? 2 : 3) + '">' + esc(v) + "</textarea></label>";
+    return '<label class="l' + cls + '">' + esc(lab) + '<input type="text" data-k="' + k + '" value="' + esc(v) + '"' + (kind === "field" ? ' list="fl"' : "") + "></label>";
+  }
+  function condsHtml(r) {
+    var w = r.when || [];
+    return '<div class="conds"><div class="bar"><b style="font-size:12.5px">When</b>' + (w.length > 1 ? '<select data-any><option value="">all of these</option><option value="1"' + (r.any ? " selected" : "") + ">any of these</option></select>" : "") +
+      (w.length ? "" : '<span class="hint">' + (r.t === "showhide" ? "add a condition" : "always (no conditions)") + "</span>") + '<span style="flex:1"></span><button data-addc>+ condition</button></div>' +
+      w.map(function (c, j) {
+        return '<div class="c" data-c="' + j + '"><input type="text" list="fl" data-cf="f" value="' + esc(c.f) + '" placeholder="FIELD"><select data-cf="op">' + OPS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === c.op ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
+          '</select><input type="text" data-cf="v" value="' + esc(c.v) + '"' + (NOVAL[c.op] ? " disabled" : "") + ' placeholder="' + (c.op === "age" ? "16-18" : c.op === "in" || c.op === "notin" ? "a,b,c" : "value") + '"><button data-delc title="Remove">✕</button></div>';
+      }).join("") + "</div>";
+  }
+  function drawRules() {
+    var R = $("rules");
+    if (!page.rules.length) { R.innerHTML = '<p class="hint">No rules yet. Add one below, or Load example.</p>'; return; }
+    R.innerHTML = page.rules.map(function (r, i) {
+      var T = TYPES[r.t];
+      return '<div class="rule' + (r.off ? " off" : "") + '" data-i="' + i + '"><div class="hd"><b>' + (i + 1) + ". " + esc(T.name) + '</b><label class="inline" style="min-height:0;font-size:12.5px"><input type="checkbox" data-on' + (r.off ? "" : " checked") + '> on</label><button data-mv="-1" title="Move up">↑</button><button data-mv="1" title="Move down">↓</button><button data-dup title="Copy">⧉</button><button data-del title="Delete">✕</button></div>' +
+        '<div class="sum">' + esc(describe(r)) + '</div><div class="body">' + T.f.map(function (f) { return control(r, f); }).join("") + (T.cond ? condsHtml(r) : "") + "</div></div>";
+    }).join("");
+  }
+  function drawAdd() { $("add").innerHTML = Object.keys(TYPES).map(function (k) { return '<button data-add="' + k + '">' + esc(TYPES[k].name) + "<small>" + esc(TYPES[k].tip) + "</small></button>"; }).join(""); }
+  function render() {
+    var v = tab === "script" ? script() : tab === "lister" ? LISTER : tab === "ajax" ? WATCH : tab === "plan" ? plan() : gotchas();
+    $("out").value = v; $("cmpW").style.display = tab === "script" ? "" : "none";
+    $("size").textContent = tab === "script" ? Math.round(v.length / 1024 * 10) / 10 + " KB" : "";
+    $("notes").innerHTML = tab === "script" ? issues().map(function (x) { return '<li class="' + (x[0] === "bad" ? "bad" : x[0] === "info" ? "hint" : "") + '">' + esc(x[1]) + "</li>"; }).join("") : "";
+  }
+  function refreshSums() { document.querySelectorAll(".rule").forEach(function (el) { var r = page.rules[+el.getAttribute("data-i")]; if (r) el.querySelector(".sum").textContent = describe(r); }); }
+  function drawAll() { drawPick(); drawCfg(); drawRules(); render(); }
+
+  // ---------- events ----------
+  ["name", "dl", "row", "datefmt", "saveWords", "saveSel", "box", "btnClass", "fields"].forEach(function (k) {
+    $("c_" + k).addEventListener("input", function () { page.cfg[k] = k === "row" ? (parseInt(this.value, 10) || 0) : this.value; save(); if (k === "name") drawPick(); if (k === "fields") fieldOpts(); render(); });
+  });
+  $("c_datefmt").addEventListener("change", function () { page.cfg.datefmt = this.value; save(); render(); });
+  $("c_debug").addEventListener("change", function () { page.cfg.debug = this.checked; save(); render(); });
+  $("compact").addEventListener("change", render);
+  $("add").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-add]"); if (!b) return; var t = b.getAttribute("data-add"), r = { t: t };
+    var init = TYPES[t].init || {}; Object.keys(init).forEach(function (k) { r[k] = init[k]; });
+    if (t === "showhide") r.when = [{ f: "", op: "is", v: "" }];
+    page.rules.push(r); save(); drawRules(); render();
+    var last = $("rules").lastElementChild; if (last) { last.scrollIntoView({ block: "nearest" }); var i = last.querySelector("input[type=text],textarea"); if (i) i.focus(); }
+  });
+  function ruleOf(el) { var c = el.closest(".rule"); return c ? { el: c, i: +c.getAttribute("data-i"), r: page.rules[+c.getAttribute("data-i")] } : null; }
+  $("rules").addEventListener("input", function (e) {
+    var x = ruleOf(e.target); if (!x) return; var t = e.target;
+    if (t.tagName === "SELECT" || t.type === "checkbox") return;   // handled on change
+    if (t.hasAttribute("data-k")) x.r[t.getAttribute("data-k")] = t.type === "checkbox" ? t.checked : t.value;
+    else if (t.hasAttribute("data-cf")) { var j = +t.closest("[data-c]").getAttribute("data-c"), k = t.getAttribute("data-cf"); x.r.when[j][k] = t.value; if (k === "op") { drawRules(); } }
+    else if (t.hasAttribute("data-any")) x.r.any = !!t.value;
+    else if (t.hasAttribute("data-on")) { x.r.off = !t.checked; x.el.classList.toggle("off", !!x.r.off); }
+    save(); refreshSums(); render();
+  });
+  $("rules").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return; var x = ruleOf(b); if (!x) return;
+    if (b.hasAttribute("data-del")) page.rules.splice(x.i, 1);
+    else if (b.hasAttribute("data-dup")) page.rules.splice(x.i + 1, 0, JSON.parse(JSON.stringify(x.r)));
+    else if (b.hasAttribute("data-mv")) { var j = x.i + +b.getAttribute("data-mv"); if (j < 0 || j >= page.rules.length) return; page.rules.splice(j, 0, page.rules.splice(x.i, 1)[0]); }
+    else if (b.hasAttribute("data-addc")) { x.r.when = x.r.when || []; x.r.when.push({ f: "", op: "is", v: "" }); }
+    else if (b.hasAttribute("data-delc")) x.r.when.splice(+b.closest("[data-c]").getAttribute("data-c"), 1);
+    else return;
+    save(); drawRules(); render();
+  });
+  // selects and tick boxes
+  $("rules").addEventListener("change", function (e) {
+    var t = e.target; if (!(t.tagName === "SELECT" || t.type === "checkbox")) return;
+    var x = ruleOf(t); if (!x) return;
+    if (t.hasAttribute("data-k")) x.r[t.getAttribute("data-k")] = t.type === "checkbox" ? t.checked : t.value;
+    else if (t.hasAttribute("data-cf")) { x.r.when[+t.closest("[data-c]").getAttribute("data-c")][t.getAttribute("data-cf")] = t.value; save(); drawRules(); render(); return; }
+    else if (t.hasAttribute("data-any")) x.r.any = !!t.value;
+    else if (t.hasAttribute("data-on")) { x.r.off = !t.checked; x.el.classList.toggle("off", !!x.r.off); }
+    save(); refreshSums(); render();
+  });
+  document.querySelectorAll("#tabs button").forEach(function (b) { b.addEventListener("click", function () { tab = b.getAttribute("data-t"); document.querySelectorAll("#tabs button").forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
+  function flash(b, x) { var o = b.textContent; b.textContent = x; setTimeout(function () { b.textContent = o; }, 1500); }
+  $("copy").addEventListener("click", function () { var b = this, v = $("out").value; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function () { flash(b, "Copied"); }, function () { $("out").select(); document.execCommand("copy"); flash(b, "Copied"); }); });
+  function download(name, text, type) { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: type || "text/plain" })); a.download = name; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); }
+  $("dl").addEventListener("click", function () { var n = slug(page.cfg.name); download(tab === "script" ? n + ".html" : tab === "lister" ? "ontrack-field-lister.js" : tab === "ajax" ? "ontrack-save-watcher.js" : n + "-" + tab + ".txt", $("out").value); });
+  $("pick").addEventListener("change", function () { st.cur = this.value; page = st.pages[st.cur]; save(); drawAll(); });
+  $("newP").addEventListener("click", function () { var p = blank(); p.cfg.dl = page.cfg.dl; st.pages[p.id] = p; st.cur = p.id; page = p; save(); drawAll(); $("c_name").select(); });
+  $("dupP").addEventListener("click", function () { var p = JSON.parse(JSON.stringify(page)); p.id = uid(); p.cfg.name += " (copy)"; st.pages[p.id] = p; st.cur = p.id; page = p; save(); drawAll(); });
+  $("delP").addEventListener("click", function () { if (!confirm("Delete \"" + page.cfg.name + "\" from this browser?")) return; delete st.pages[st.cur]; save(); load(); save(); drawAll(); });
+  $("expJ").addEventListener("click", function () { download(slug(page.cfg.name) + ".ontrack.json", JSON.stringify({ bitkOntrackPage: 1, cfg: page.cfg, rules: page.rules }, null, 2), "application/json"); });
+  $("impJ").addEventListener("click", function () { $("impF").click(); });
+  $("impF").addEventListener("change", function () {
+    var f = this.files[0]; if (!f) return; var rd = new FileReader();
+    rd.onload = function () { try { var o = JSON.parse(rd.result); if (!o.cfg || !Array.isArray(o.rules)) throw 0; var p = { id: uid(), cfg: Object.assign(blank().cfg, o.cfg), rules: o.rules.filter(function (r) { return TYPES[r.t]; }), updated: Date.now() }; st.pages[p.id] = p; st.cur = p.id; page = p; save(); drawAll(); } catch (e) { alert("That file isn't an Ontrack Page Builder export."); } };
+    rd.readAsText(f); this.value = "";
+  });
+  $("ex").addEventListener("click", function () {
+    var p = blank("Learner employment status (example)");
+    p.cfg.dl = "EmploymentStatus"; p.cfg.fields = "PersonDetails.DATE_OF_BIRTH\nMODE_OF_ATTENDANCE\nEMPLOYMENT_STATUS\nEMP_DATE_FROM\nLENGTH_OF_UNEMP\nHOURS_PER_WEEK\nANNUAL_HOURS\nPersonDetails.ULN\nCHECKED_BY\nCHECKED_DATE";
+    var w1618 = [{ f: "PersonDetails.DATE_OF_BIRTH", op: "age", v: "16-18" }, { f: "MODE_OF_ATTENDANCE", op: "is", v: "FT" }];
+    p.rules = [
+      { t: "default", field: "EMPLOYMENT_STATUS", how: "text", value: "12", onlyNew: true, when: w1618 },
+      { t: "default", field: "EMP_DATE_FROM", how: "today", onlyNew: true, when: [{ f: "EMPLOYMENT_STATUS", op: "filled", v: "" }] },
+      { t: "showhide", mode: "show", fields: "LENGTH_OF_UNEMP", clear: true, when: [{ f: "EMPLOYMENT_STATUS", op: "in", v: "11,12" }] },
+      { t: "required", fields: "EMP_DATE_FROM", msg: "Employment status needs a date from", when: [{ f: "EMPLOYMENT_STATUS", op: "filled", v: "" }] },
+      { t: "computed", field: "ANNUAL_HOURS", formula: "num({HOURS_PER_WEEK}) * 36", onlyBlank: false, when: [{ f: "HOURS_PER_WEEK", op: "filled", v: "" }] },
+      { t: "validate", field: "PersonDetails.ULN", check: "uln", msg: "That ULN fails its check digit: probably a typo" },
+      { t: "validate", field: "EMP_DATE_FROM", check: "notfuture", msg: "Date from can't be in the future" },
+      { t: "lock", fields: "EMPLOYMENT_STATUS, EMP_DATE_FROM", when: [{ f: "CHECKED_BY", op: "filled", v: "" }] },
+      { t: "banner", text: "16-18 full-time learner: status filled in for you as 12. Please check it with the learner.", tone: "info", place: "top", when: w1618 },
+      { t: "button", label: "Mark as checked", action: "js", code: "set('CHECKED_BY', 'Staff');\nset('CHECKED_DATE', today());\ntoast('Marked as checked: remember to Save');", place: "top", when: [{ f: "CHECKED_BY", op: "blank", v: "" }] },
+      { t: "grid", grid: "#EmploymentHistoryGrid", col: "Status", op: "blank", v: "", tone: "amber", row: true },
+      { t: "aftersave", url: "/Save", postOnly: true, action: "message", arg: "Employment status saved ✓", later: false }
+    ];
+    st.pages[p.id] = p; st.cur = p.id; page = p; save(); drawAll();
+  });
+
+  load(); drawAdd(); drawAll();
+  window.__otb = { script: script, plan: plan, issues: issues, page: function () { return page; } };
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>

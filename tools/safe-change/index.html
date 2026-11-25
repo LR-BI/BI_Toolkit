@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Safe Change Script · BI Toolkit</title>
+<script src="../../assets/boot.js"></script>
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../../assets/style.css">
+<style>
+  main.wide { max-width: none; }
+  .sc { display: grid; grid-template-columns: minmax(340px, 460px) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .sc label.l { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  .sc input[type=text], .sc input[type=number], .sc select, .sc textarea { width: 100%; box-sizing: border-box; }
+  .sc textarea { font-family: var(--mono); font-size: 12.5px; min-height: 64px; white-space: pre; tab-size: 4; }
+  .sc .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ops { display: flex; gap: 6px; } .ops button { flex: 1; min-height: 0; padding: 6px; }
+  .ops button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .sc .chk { display: flex; gap: 7px; align-items: flex-start; font-size: 13.5px; margin-top: 8px; color: var(--text); } .sc .chk input { margin-top: 3px; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 8px; flex-wrap: wrap; }
+  .tabs button { border: 0; border-bottom: 2px solid transparent; background: none; border-radius: 0; padding: 7px 12px; min-height: 0; font-size: 14px; color: var(--muted); }
+  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  #out { width: 100%; box-sizing: border-box; min-height: 560px; height: calc(100vh - 230px); font-family: var(--mono); font-size: 12.5px; line-height: 1.45; white-space: pre; background: var(--panel); }
+  .bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; } .bar button { min-height: 0; padding: 5px 10px; font-size: 13px; }
+  .warns { margin: 10px 0 0; padding-left: 18px; font-size: 13.5px; } .warns li { margin: 3px 0; } .warns .bad { color: var(--danger); font-weight: 600; }
+  .right { position: sticky; top: 64px; }
+  @media (max-width: 1000px) { .sc { grid-template-columns: minmax(0, 1fr); } .right { position: static; } #out { height: auto; } }
+</style>
+</head>
+<body>
+<main class="wide">
+  <h1>Safe Change Script</h1>
+  <p class="lead">Builds a script for changing live data safely: preview the rows, back them up to a <code>BAK_</code> table, make the change inside a transaction, check the row count, and log the run. It's a <strong>dry run until you set <code>@Commit = 1</code></strong>. You also get an undo script.</p>
+  <details class="howto"><summary>How to use</summary>
+    <ol>
+      <li>Pick <strong>UPDATE</strong>, <strong>DELETE</strong> or <strong>INSERT</strong>, the table, and the <strong>key columns</strong> that identify a row (e.g. <code>PERSON_CODE, ROLE_ID</code>). The target table is always aliased <code>t</code>.</li>
+      <li>Say which rows (<code>WHERE</code>, plus any joins) and what changes. For INSERT, write a SELECT that returns the new rows.</li>
+      <li>Run the script's preview first (select it in SSMS and press F5 on just that part), count the rows, and put that number in <strong>Expected rows</strong>.</li>
+      <li>Run the whole script: it's a <strong>dry run</strong>. It does everything, checks the count, then rolls back and prints what would have happened.</li>
+      <li>Happy? Change <code>@Commit</code> to 1 and run again. The backup table and the <strong>Undo</strong> script let you put it back.</li>
+      <li>First time only: run <strong>Log table setup</strong> once to create the log table.</li>
+    </ol>
+  </details>
+
+  <div class="sc">
+    <div>
+      <div class="ops" id="ops"><button data-op="UPDATE" class="on">UPDATE</button><button data-op="DELETE">DELETE</button><button data-op="INSERT">INSERT</button></div>
+      <div class="two">
+        <div><label class="l" for="db">Database (optional)</label><input type="text" id="db" placeholder="e.g. EBSLIVE"></div>
+        <div><label class="l" for="tbl">Table</label><input type="text" id="tbl" placeholder="dbo.ROLES"></div>
+      </div>
+      <label class="l" for="keys">Key columns (identify one row)</label><input type="text" id="keys" placeholder="e.g. ID   or   PERSON_CODE, ROLE_ID">
+      <div id="updBox">
+        <label class="l" for="set">Change: one <code>COLUMN = new value</code> per line</label>
+        <textarea id="set" spellcheck="false" placeholder="GROUP_ID = 215&#10;UPDATED_DATE = GETDATE()"></textarea>
+      </div>
+      <div id="whereBox">
+        <label class="l" for="joins">Joins (optional; the table is <code>t</code>)</label>
+        <textarea id="joins" spellcheck="false" placeholder="INNER JOIN dbo.PEOPLE p ON p.PERSON_CODE = t.PERSON_CODE"></textarea>
+        <label class="l" for="where">Which rows: WHERE …</label>
+        <textarea id="where" spellcheck="false" placeholder="t.ROLE_ID = 42 AND p.AVAILABILITY_CODE = 'U'"></textarea>
+      </div>
+      <div id="insBox" hidden>
+        <label class="l" for="cols">Columns to insert</label><input type="text" id="cols" placeholder="GROUP_ID, ROLE_ID">
+        <label class="l" for="src">New rows: a SELECT returning those columns, in that order</label>
+        <textarea id="src" spellcheck="false" style="min-height:110px" placeholder="SELECT 215 AS GROUP_ID, r.ROLE_ID&#10;FROM dbo.ROLES r&#10;WHERE r.PERSON_CODE = 12345"></textarea>
+        <label class="chk"><input type="checkbox" id="skipEx" checked> Skip rows that already exist (matching the key columns)</label>
+      </div>
+      <div id="delBox" hidden>
+        <label class="l" for="allCols">All the table's columns (optional, makes the undo exact)</label><input type="text" id="allCols" placeholder="leave blank to undo with SELECT *">
+      </div>
+      <div class="two">
+        <div><label class="l" for="exp">Expected rows</label><input type="number" id="exp" min="0" placeholder="from the preview"></div>
+        <div><label class="l" for="reason">Reason / ticket</label><input type="text" id="reason" placeholder="e.g. Permissions overhaul: Admissions"></div>
+      </div>
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">Backup, log and header</summary>
+        <div class="two">
+          <div><label class="l" for="bak">Backup schema / prefix</label><input type="text" id="bak" value="dbo.BAK_"></div>
+          <div><label class="l" for="log">Log table</label><input type="text" id="log" value="dbo.BI_CHANGE_LOG"></div>
+        </div>
+        <div class="two">
+          <div><label class="l" for="title">Title for notes block</label><input type="text" id="title" placeholder="e.g. Admissions roles to group 215"></div>
+          <div><label class="l" for="who">Initials</label><input type="text" id="who" value="LR"></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="hdr" checked> Add a notes block at the top</label>
+      </details>
+      <ul class="warns" id="warns"></ul>
+      <div class="bar" style="margin-top:12px"><button id="ex">Load example (roles to a group)</button><button id="reset">Start again</button></div>
+    </div>
+    <div class="right">
+      <div class="tabs" id="tabs"><button data-t="run" class="on">Change script</button><button data-t="undo">Undo</button><button data-t="setup">Log table setup</button><button data-t="check">Checklist</button></div>
+      <div class="bar"><button id="copy" class="primary">Copy</button><button id="dl">Download .sql</button><span class="hint" id="bakName"></span></div>
+      <textarea id="out" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var op = "UPDATE", tab = "run", stamp = "", PREF = "bitk.safechange.v1";
+  function pad(n) { return ("0" + n).slice(-2); }
+  function newStamp() { var d = new Date(); stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()); }
+  newStamp();
+  function list(s) { return String(s || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean); }
+  function lit(s) { return "N'" + String(s).replace(/'/g, "''") + "'"; }
+  function shortName(t) { return t.split(".").pop().replace(/[\[\]]/g, ""); }
+  function ind(s, n) { var p = " ".repeat(n); return s.split("\n").map(function (l) { return l ? p + l : l; }).join("\n"); }
+  function noteDate() { var d = new Date(); return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + String(d.getFullYear()).slice(2); }
+
+  function cfg() {
+    return { op: op, db: $("db").value.trim(), tbl: $("tbl").value.trim(), keys: list($("keys").value), set: $("set").value.split("\n").map(function (l) { return l.trim().replace(/,$/, ""); }).filter(Boolean),
+      joins: $("joins").value.trim(), where: $("where").value.trim().replace(/^WHERE\s+/i, ""), cols: list($("cols").value), src: $("src").value.trim().replace(/;\s*$/, ""), skipEx: $("skipEx").checked,
+      allCols: list($("allCols").value), exp: $("exp").value === "" ? null : parseInt($("exp").value, 10), reason: $("reason").value.trim(),
+      bak: $("bak").value.trim() || "dbo.BAK_", log: $("log").value.trim() || "dbo.BI_CHANGE_LOG", title: $("title").value.trim(), who: $("who").value.trim() || "LR", hdr: $("hdr").checked };
+  }
+  function bakTable(c) { return c.bak + shortName(c.tbl || "TABLE").toUpperCase() + (c.op === "INSERT" ? "_NEW_" : c.op === "DELETE" ? "_DEL_" : "_UPD_") + stamp; }
+  function warnings(c) {
+    var w = [];
+    if (!c.tbl) w.push(["bad", "Enter the table."]);
+    if (!c.keys.length) w.push(["bad", "Enter the key column(s); the backup and undo match rows on them."]);
+    if (c.op !== "INSERT" && !c.where) w.push(["bad", "No WHERE: this would change every row in " + (c.tbl || "the table") + ". The script refuses to run without one."]);
+    if (c.op === "UPDATE" && !c.set.length) w.push(["bad", "Add at least one COLUMN = value line."]);
+    if (c.op === "UPDATE" && c.set.some(function (l) { return !/^[\w.\[\]]+\s*=/.test(l); })) w.push(["bad", "Each change line should look like COLUMN = value."]);
+    if (c.op === "UPDATE" && c.set.some(function (l) { var col = l.split("=")[0].trim().replace(/^t\./i, "").toUpperCase(); return c.keys.some(function (k) { return k.toUpperCase().replace(/^t\./i, "") === col; }); })) w.push(["bad", "You're changing a key column. The undo matches on keys, so pick keys that don't change (e.g. the ID)."]);
+    if (c.op === "INSERT" && (!c.cols.length || !c.src)) w.push(["bad", "List the columns and write the SELECT that returns the new rows."]);
+    if (c.op === "INSERT" && c.keys.some(function (k) { return c.cols.map(function (x) { return x.toUpperCase(); }).indexOf(k.toUpperCase()) < 0; })) w.push(["bad", "For INSERT, the key columns must be among the inserted columns (used to skip duplicates and to undo)."]);
+    if (c.exp === null) w.push(["warn", "Set Expected rows from the preview. Until you do, the script stops before changing anything."]);
+    if (c.joins && c.op !== "INSERT") w.push(["warn", "With joins, check the preview has one row per key: if a row matches twice, the change and the count can differ."]);
+    if (!c.reason) w.push(["warn", "Add a reason or ticket so the log says why."]);
+    if (c.op === "DELETE" && !c.allCols.length) w.push(["warn", "Undo for DELETE uses INSERT … SELECT *. If the table has an IDENTITY or computed column, list all columns so the undo can be exact."]);
+    return w;
+  }
+  function header(c, what) {
+    if (!c.hdr) return "";
+    var W = 150, title = c.title || ("Safe change: " + c.op + " " + (c.tbl || "table"));
+    return "/*" + "=".repeat(W - 2) + "\n" + " ".repeat(52) + title + "\n\n" + c.who + " - " + what + " | " + noteDate() + "\n\n" +
+      "Dry run by default: set @Commit = 1 to keep the change. Backup: " + bakTable(c) + (c.reason ? "\nReason: " + c.reason : "") + "\n\n" + "=".repeat(W) + "*/\n\n";
+  }
+  function useDb(c) { return c.db ? "USE " + (/^\[/.test(c.db) ? c.db : "[" + c.db + "]") + ";\nGO\n\n" : ""; }
+  function keyJoin(c, a, b) { return c.keys.map(function (k) { var kk = k.replace(/^t\./i, ""); return a + "." + kk + " = " + b + "." + kk; }).join(" AND "); }
+  function qcol(col) { return /^t\./i.test(col) ? col : "t." + col; }
+
+  function changeScript(c) {
+    var B = bakTable(c), T = c.tbl || "dbo.TABLE", L = [], from = "FROM " + T + " t" + (c.joins ? "\n" + c.joins : "") + "\nWHERE " + (c.where || "1 = 0 /* add a WHERE */");
+    var what = c.op === "UPDATE" ? "UPDATE " + T + ": " + c.set.join(", ") : c.op === "DELETE" ? "DELETE from " + T : "INSERT into " + T + " (" + c.cols.join(", ") + ")";
+    L.push(header(c, what) + useDb(c) + "SET XACT_ABORT ON;   -- any error rolls the whole thing back\nSET NOCOUNT ON;\n");
+    L.push("DECLARE @Commit   bit           = 0;     -- 0 = dry run (rolls back). Set to 1 to keep the change.");
+    L.push("DECLARE @Expected int           = " + (c.exp === null ? "NULL;  -- put the row count from the preview here" : c.exp + ";") );
+    L.push("DECLARE @Reason   nvarchar(400) = " + lit(c.reason || "") + ";");
+    L.push("DECLARE @Rows     int, @Msg nvarchar(2048);\n");
+    // preview
+    L.push("------------------------------------------------------------------\n-- 1. Preview: the rows this will " + (c.op === "INSERT" ? "add" : "change") + " (run on its own first)\n------------------------------------------------------------------");
+    if (c.op === "UPDATE") {
+      L.push("SELECT " + c.keys.map(qcol).join(", ") + ",\n" + c.set.map(function (l) { var p = l.split("="), col = p.shift().trim(), val = p.join("=").trim(), bare = col.replace(/^t\./i, ""); return "       " + qcol(col) + " AS [" + bare + " now], " + val + " AS [" + bare + " new]"; }).join(",\n") + "\n" + from + ";\n");
+    } else if (c.op === "DELETE") {
+      L.push("SELECT t.*\n" + from + ";\n");
+    } else {
+      L.push(insertSource(c, T) + ";\n");
+    }
+    L.push("IF @Expected IS NULL\nBEGIN\n    PRINT 'Run the preview above, then set @Expected to its row count. Nothing has been changed.';\n    RETURN;\nEND;\n");
+    L.push("BEGIN TRY\n    BEGIN TRANSACTION;\n");
+    if (c.op === "INSERT") {
+      L.push("    -- 2. Stage the new rows. This table is also what the undo deletes.");
+      L.push(ind("SELECT s.*\nINTO " + B + "\nFROM (\n" + ind(c.src, 4) + "\n) s" + (c.skipEx ? "\nWHERE NOT EXISTS (SELECT 1 FROM " + T + " t WHERE " + keyJoin(c, "t", "s") + ")" : "") + ";", 4));
+    } else {
+      L.push("    -- 2. Back up the rows before touching them");
+      L.push(ind("SELECT t.*\nINTO " + B + "\n" + from + ";", 4));
+    }
+    L.push("    CREATE CLUSTERED INDEX IX_" + shortName(B) + " ON " + B + " (" + c.keys.map(function (k) { return k.replace(/^t\./i, ""); }).join(", ") + ");\n");
+    L.push("    -- 3. Make the change");
+    if (c.op === "UPDATE") L.push(ind("UPDATE t\nSET " + c.set.map(function (l) { var p = l.split("="), col = p.shift().trim(); return qcol(col) + " = " + p.join("=").trim(); }).join(",\n    ") + "\n" + from + ";", 4));
+    else if (c.op === "DELETE") L.push(ind("DELETE t\n" + from + ";", 4));
+    else L.push(ind("INSERT INTO " + T + " (" + c.cols.join(", ") + ")\nSELECT " + c.cols.join(", ") + "\nFROM " + B + ";", 4));
+    L.push("    SET @Rows = @@ROWCOUNT;\n");
+    L.push("    -- 4. Check the count, and refuse if it's not what you expected");
+    L.push("    IF @Rows <> @Expected\n    BEGIN\n        SET @Msg = CONCAT('Expected ', @Expected, ' rows but ', @Rows, ' would change. Rolled back; nothing kept.');\n        THROW 50001, @Msg, 1;\n    END;\n");
+    L.push("    -- 5. Keep it, or roll back (dry run)\n    IF @Commit = 1\n    BEGIN\n        COMMIT TRANSACTION;\n        PRINT CONCAT('Done: ', @Rows, ' rows " + (c.op === "UPDATE" ? "updated" : c.op === "DELETE" ? "deleted" : "inserted") + ". Backup: " + B + "');\n    END\n    ELSE\n    BEGIN\n        ROLLBACK TRANSACTION;\n        PRINT CONCAT('Dry run OK: ', @Rows, ' rows would " + (c.op === "UPDATE" ? "change" : c.op === "DELETE" ? "be deleted" : "be added") + ". Nothing kept. Set @Commit = 1 and run again.');\n    END;\n");
+    L.push("    -- 6. Log the run (dry runs too)\n    IF OBJECT_ID(" + lit(c.log) + ") IS NOT NULL\n        INSERT INTO " + c.log + " (RunAt, RunBy, TableName, Action, RowsExpected, RowsAffected, BackupTable, Committed, Reason)\n        VALUES (SYSDATETIME(), SUSER_SNAME(), " + lit(T) + ", " + lit(c.op) + ", @Expected, @Rows, " + "CASE WHEN @Commit = 1 THEN " + lit(B) + " END" + ", @Commit, @Reason);");
+    L.push("END TRY\nBEGIN CATCH\n    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;\n    THROW;\nEND CATCH;");
+    return L.join("\n");
+  }
+  function insertSource(c, T) {
+    return "SELECT s.*\nFROM (\n" + ind(c.src, 4) + "\n) s" + (c.skipEx ? "\nWHERE NOT EXISTS (SELECT 1 FROM " + T + " t WHERE " + keyJoin(c, "t", "s") + ")" : "");
+  }
+  function undoScript(c) {
+    var B = bakTable(c), T = c.tbl || "dbo.TABLE", L = [];
+    L.push(header(c, "UNDO of " + c.op + " on " + T + " using " + B) + useDb(c) + "SET XACT_ABORT ON;\nSET NOCOUNT ON;\n");
+    L.push("DECLARE @Commit bit = 0;   -- 0 = dry run. Set to 1 to keep the undo.\nDECLARE @Rows int, @Want int, @Msg nvarchar(2048);\n");
+    L.push("SELECT @Want = COUNT(*) FROM " + B + ";   -- rows saved by the original run\n");
+    L.push("BEGIN TRY\n    BEGIN TRANSACTION;\n");
+    if (c.op === "UPDATE") {
+      var cols = c.set.map(function (l) { return l.split("=")[0].trim().replace(/^t\./i, ""); });
+      L.push("    -- Put the old values back from the backup");
+      L.push(ind("UPDATE t\nSET " + cols.map(function (col) { return "t." + col + " = b." + col; }).join(",\n    ") + "\nFROM " + T + " t\nINNER JOIN " + B + " b ON " + keyJoin(c, "t", "b") + ";", 4));
+    } else if (c.op === "DELETE") {
+      L.push("    -- Re-insert the deleted rows from the backup");
+      if (c.allCols.length) L.push(ind("-- SET IDENTITY_INSERT " + T + " ON;   -- only if one of the columns is an IDENTITY\nINSERT INTO " + T + " (" + c.allCols.join(", ") + ")\nSELECT " + c.allCols.join(", ") + "\nFROM " + B + ";\n-- SET IDENTITY_INSERT " + T + " OFF;", 4));
+      else L.push(ind("-- Same column order as the table. If it has an IDENTITY column, list the columns and use SET IDENTITY_INSERT ON.\nINSERT INTO " + T + "\nSELECT *\nFROM " + B + ";", 4));
+    } else {
+      L.push("    -- Delete the rows that were added (matched on the key columns)");
+      L.push(ind("DELETE t\nFROM " + T + " t\nINNER JOIN " + B + " b ON " + keyJoin(c, "t", "b") + ";", 4));
+    }
+    L.push("    SET @Rows = @@ROWCOUNT;\n");
+    L.push("    IF @Rows <> @Want\n    BEGIN\n        SET @Msg = CONCAT('Backup has ', @Want, ' rows but ', @Rows, ' were matched. Rolled back.');\n        THROW 50002, @Msg, 1;\n    END;\n");
+    L.push("    IF @Commit = 1 BEGIN COMMIT TRANSACTION; PRINT CONCAT('Undone: ', @Rows, ' rows.'); END\n    ELSE BEGIN ROLLBACK TRANSACTION; PRINT CONCAT('Dry run OK: ', @Rows, ' rows would be put back. Set @Commit = 1 to keep.'); END;\n");
+    L.push("    IF OBJECT_ID(" + lit(c.log) + ") IS NOT NULL\n        INSERT INTO " + c.log + " (RunAt, RunBy, TableName, Action, RowsExpected, RowsAffected, BackupTable, Committed, Reason)\n        VALUES (SYSDATETIME(), SUSER_SNAME(), " + lit(T) + ", 'UNDO', @Want, @Rows, " + lit(B) + ", @Commit, " + lit("Undo: " + (c.reason || "")) + ");");
+    L.push("END TRY\nBEGIN CATCH\n    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;\n    THROW;\nEND CATCH;");
+    L.push("\n-- When you're sure the change is right (e.g. after a month), tidy up:\n-- DROP TABLE " + B + ";");
+    return L.join("\n");
+  }
+  function setupScript(c) {
+    var t = c.log, nm = shortName(t);
+    return useDb(c) + "-- Run once per database. Creates the log every Safe Change script writes to.\nIF OBJECT_ID(" + lit(t) + ") IS NULL\nBEGIN\n    CREATE TABLE " + t + " (\n        LogID        int IDENTITY(1,1) NOT NULL CONSTRAINT PK_" + nm + " PRIMARY KEY,\n        RunAt        datetime2(0)  NOT NULL,\n        RunBy        sysname       NOT NULL,\n        TableName    nvarchar(256) NOT NULL,\n        Action       varchar(10)   NOT NULL,   -- UPDATE / DELETE / INSERT / UNDO\n        RowsExpected int           NULL,\n        RowsAffected int           NULL,\n        BackupTable  nvarchar(256) NULL,      -- only filled in when the change was kept\n        Committed    bit           NOT NULL,  -- 0 = dry run\n        Reason       nvarchar(400) NULL\n    );\n    CREATE INDEX IX_" + nm + "_Table ON " + t + " (TableName, RunAt);\nEND;\n\n-- What's been changed recently\nSELECT TOP 50 * FROM " + t + " ORDER BY RunAt DESC;\n\n-- Backup tables still around (oldest first)\nSELECT s.name + '.' + o.name AS BackupTable, o.create_date\nFROM sys.objects o JOIN sys.schemas s ON s.schema_id = o.schema_id\nWHERE o.type = 'U' AND o.name LIKE " + lit(shortName(c.bak) + "%") + "\nORDER BY o.create_date;";
+  }
+  function checklist(c) {
+    return ["Before running " + c.op + " on " + (c.tbl || "the table") + ":", "",
+      "[ ] Right server and database (USE " + (c.db || "…") + ")",
+      "[ ] Ran the preview on its own; it returned " + (c.exp === null ? "__" : c.exp) + " rows and they're the right ones",
+      "[ ] Each key value appears once in the preview (no duplicates from joins)",
+      "[ ] Ran the whole script as a dry run (@Commit = 0): message says 'Dry run OK'",
+      "[ ] Saved the undo script next to the change script",
+      "[ ] Set @Commit = 1 and ran it once",
+      "[ ] Checked the log: SELECT TOP 5 * FROM " + c.log + " ORDER BY RunAt DESC",
+      "[ ] Spot-checked the changed rows / the screen or report that uses them",
+      "[ ] Noted the backup table name: " + bakTable(c), "",
+      "If anything looks wrong: run the Undo script (dry run first, then @Commit = 1)."].join("\n");
+  }
+  function render() {
+    var c = cfg(), w = warnings(c);
+    $("warns").innerHTML = w.map(function (x) { return '<li class="' + (x[0] === "bad" ? "bad" : "") + '">' + x[1].replace(/[&<>]/g, function (ch) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]; }) + "</li>"; }).join("");
+    $("out").value = tab === "run" ? changeScript(c) : tab === "undo" ? undoScript(c) : tab === "setup" ? setupScript(c) : checklist(c);
+    $("bakName").textContent = tab === "setup" || tab === "check" ? "" : "Backup table: " + bakTable(c);
+    try { localStorage.setItem(PREF, JSON.stringify({ bak: c.bak, log: c.log, who: c.who, db: c.db })); } catch (e) {}
+  }
+  function setOp(o) { op = o; document.querySelectorAll("#ops button").forEach(function (b) { b.classList.toggle("on", b.dataset.op === o); }); $("updBox").hidden = o !== "UPDATE"; $("whereBox").hidden = o === "INSERT"; $("insBox").hidden = o !== "INSERT"; $("delBox").hidden = o !== "DELETE"; render(); }
+  document.querySelectorAll("#ops button").forEach(function (b) { b.addEventListener("click", function () { setOp(b.dataset.op); }); });
+  document.querySelectorAll("#tabs button").forEach(function (b) { b.addEventListener("click", function () { tab = b.dataset.t; document.querySelectorAll("#tabs button").forEach(function (x) { x.classList.toggle("on", x === b); }); render(); }); });
+  ["db", "tbl", "keys", "set", "joins", "where", "cols", "src", "allCols", "exp", "reason", "bak", "log", "title", "who"].forEach(function (k) { $(k).addEventListener("input", render); });
+  ["skipEx", "hdr"].forEach(function (k) { $(k).addEventListener("change", render); });
+  ["set", "joins", "where", "src"].forEach(function (k) { $(k).addEventListener("keydown", function (e) { if (e.key === "Tab") { e.preventDefault(); var a = this.selectionStart; this.setRangeText("    ", a, this.selectionEnd, "end"); render(); } }); });
+  function flash(b, x) { var o = b.textContent; b.textContent = x; setTimeout(function () { b.textContent = o; }, 1500); }
+  $("copy").addEventListener("click", function () { var b = this, v = $("out").value; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(function () { flash(b, "Copied"); }, function () { $("out").select(); document.execCommand("copy"); flash(b, "Copied"); }); });
+  $("dl").addEventListener("click", function () { var c = cfg(), a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([$("out").value], { type: "text/plain" })); a.download = (tab === "setup" ? "setup-" + shortName(c.log) : (tab === "undo" ? "UNDO-" : "") + c.op + "-" + shortName(c.tbl || "table") + "-" + stamp) + (tab === "check" ? ".txt" : ".sql"); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000); });
+  $("ex").addEventListener("click", function () {
+    setOp("INSERT"); $("db").value = "EBSLIVE"; $("tbl").value = "dbo.ROLES"; $("keys").value = "GROUP_ID, ROLE_ID"; $("cols").value = "GROUP_ID, ROLE_ID";
+    $("src").value = "-- every role the Admissions template user has, given to group 215 instead\nSELECT DISTINCT 215 AS GROUP_ID, r.ROLE_ID\nFROM dbo.ROLES r\nWHERE r.PERSON_CODE = 900001   -- template user (example)";
+    $("skipEx").checked = true; $("exp").value = ""; $("reason").value = "Permissions overhaul: Admissions roles to group 215 (example)"; $("title").value = "Admissions roles to group 215"; newStamp(); render();
+  });
+  $("reset").addEventListener("click", function () { ["tbl", "keys", "set", "joins", "where", "cols", "src", "allCols", "exp", "reason", "title"].forEach(function (k) { $(k).value = ""; }); newStamp(); setOp("UPDATE"); });
+  try { var pr = JSON.parse(localStorage.getItem(PREF) || "{}"); if (pr.bak) $("bak").value = pr.bak; if (pr.log) $("log").value = pr.log; if (pr.who) $("who").value = pr.who; if (pr.db) $("db").value = pr.db; } catch (e) {}
+  render();
+  window.__sc = { cfg: cfg, changeScript: changeScript, undoScript: undoScript, setupScript: setupScript, setOp: setOp, render: render };
+})();
+</script>
+<script src="../../assets/tools.js"></script>
+<script src="../../assets/shell.js"></script>
+<script src="../../assets/howto.js"></script>
+</body>
+</html>
